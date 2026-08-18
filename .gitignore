@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+
+# Zeno private/local data
+zeno.db
+*.db
+zeno_data/
+user_data/
+browser_profile/
+browser-data/
+playwright-profile/
+uploads/
+outputs/
+downloads/
+screenshots/
+logs/
+*.log
+
+# Secrets and local configuration
+DISCORD_TOKEN.txt
+.env
+.env.*
+*.key
+*.pem
+
+# Backups / generated packages
+backup-*/
+backups/
+*.bak
+*.tmp
+*.zip
+
+# OS / editors
+.DS_Store
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/

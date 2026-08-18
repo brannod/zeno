@@ -1,0 +1,113 @@
+name: Sync Zeno source from release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Pick release tag
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="$(gh release view --json tagName --jq '.tagName')"
+          fi
+          test -n "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Using release $TAG"
+
+      - name: Download clean release package
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          rm -rf /tmp/zeno-release /tmp/zeno-extract
+          mkdir -p /tmp/zeno-release /tmp/zeno-extract
+          if ! gh release download "$TAG" --pattern '*GitHub_Release_Package.zip' --dir /tmp/zeno-release; then
+            echo 'Named clean package not found, trying the first ZIP asset.'
+            gh release download "$TAG" --pattern '*.zip' --dir /tmp/zeno-release
+          fi
+          ZIP="$(find /tmp/zeno-release -maxdepth 1 -type f -name '*.zip' | sort | head -n 1)"
+          test -n "$ZIP"
+          unzip -q "$ZIP" -d /tmp/zeno-extract
+          echo "Downloaded $(basename "$ZIP")"
+
+      - name: Copy only public Zeno source files
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          SOURCE_FILE="$(find /tmp/zeno-extract -type f -name 'zeno.py' -print -quit)"
+          test -n "$SOURCE_FILE"
+          SOURCE_DIR="$(dirname "$SOURCE_FILE")"
+
+          SAFE_FILES=(
+            zeno.py
+            app.html
+            requirements.txt
+            START_ZENO.bat
+            INSTALL_ZENO.bat
+            README.txt
+            FIRST_TIME_USER_GUIDE.txt
+            DISCORD_GUIDE.txt
+            ZENO_LEGACY_MEMORY_IMPORT.md
+            zeno-icon.png
+          )
+
+          for FILE in "${SAFE_FILES[@]}"; do
+            if [ -f "$SOURCE_DIR/$FILE" ]; then
+              cp "$SOURCE_DIR/$FILE" "$FILE"
+            fi
+          done
+
+          cat > DISCORD_TOKEN.example.txt <<'EOF'
+          # Zeno Discord bridge example configuration
+          # Copy this file locally to DISCORD_TOKEN.txt and fill in your own values.
+          # NEVER commit your real DISCORD_TOKEN.txt to GitHub.
+
+          ENABLED=false
+          TOKEN=DISCORD_BOT_TOKEN_HERE
+          SERVER_ID=DISCORD_SERVER_ID_HERE
+          CHANNEL_ID=DISCORD_CHANNEL_ID_HERE
+          CHAT_ID=CURRENT
+          EOF
+
+          printf '%s\n' "$TAG" > VERSION
+
+          # Never allow private/runtime files from a release archive into the repository.
+          rm -rf zeno_data user_data browser_profile uploads outputs downloads screenshots logs
+          rm -f DISCORD_TOKEN.txt zeno.db .env
+
+      - name: Commit synced source
+        shell: bash
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add zeno.py app.html requirements.txt START_ZENO.bat INSTALL_ZENO.bat README.txt FIRST_TIME_USER_GUIDE.txt DISCORD_GUIDE.txt ZENO_LEGACY_MEMORY_IMPORT.md DISCORD_TOKEN.example.txt VERSION
+          if [ -f zeno-icon.png ]; then git add zeno-icon.png; fi
+          if git diff --cached --quiet; then
+            echo 'Source is already synchronized.'
+            exit 0
+          fi
+          git commit -m "Sync Zeno source from $TAG [skip release]"
+          git push origin main

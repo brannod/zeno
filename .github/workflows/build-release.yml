@@ -1,0 +1,118 @@
+name: Build Zeno updater release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - VERSION
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[skip release]')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          test -f VERSION
+          TAG="$(tr -d '\r\n ' < VERSION)"
+          if ! printf '%s' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9._-]+)?$'; then
+            echo "Invalid VERSION: $TAG"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate core source
+        shell: bash
+        run: |
+          test -f zeno.py
+          test -f app.html
+          python -m py_compile zeno.py
+
+      - name: Build clean updater ZIP
+        id: package
+        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION_NUMBER: ${{ steps.version.outputs.version }}
+        run: |
+          rm -rf dist
+          mkdir -p dist/Zeno
+
+          FILES=(
+            zeno.py
+            app.html
+            requirements.txt
+            START_ZENO.bat
+            INSTALL_ZENO.bat
+            README.txt
+            FIRST_TIME_USER_GUIDE.txt
+            DISCORD_GUIDE.txt
+            ZENO_LEGACY_MEMORY_IMPORT.md
+          )
+
+          for FILE in "${FILES[@]}"; do
+            if [ -f "$FILE" ]; then cp "$FILE" dist/Zeno/; fi
+          done
+          if [ -f zeno-icon.png ]; then cp zeno-icon.png dist/Zeno/; fi
+
+          if [ -f DISCORD_TOKEN.example.txt ]; then
+            cp DISCORD_TOKEN.example.txt dist/Zeno/DISCORD_TOKEN.txt
+          else
+            cat > dist/Zeno/DISCORD_TOKEN.txt <<'EOF'
+          ENABLED=false
+          TOKEN=DISCORD_BOT_TOKEN_HERE
+          SERVER_ID=DISCORD_SERVER_ID_HERE
+          CHANNEL_ID=DISCORD_CHANNEL_ID_HERE
+          CHAT_ID=CURRENT
+          EOF
+          fi
+
+          ZIP="Zeno_V${VERSION_NUMBER}_GitHub_Release_Package.zip"
+          (cd dist && zip -qr "$ZIP" Zeno)
+          echo "zip=dist/$ZIP" >> "$GITHUB_OUTPUT"
+          echo "name=$ZIP" >> "$GITHUB_OUTPUT"
+
+      - name: Create or refresh GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          ZIP: ${{ steps.package.outputs.zip }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; replacing updater ZIP."
+            gh release upload "$TAG" "$ZIP" --clobber
+            gh release edit "$TAG" --latest
+          else
+            if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+              git tag "$TAG"
+              git push origin "$TAG"
+            fi
+            gh release create "$TAG" "$ZIP" \
+              --title "Zeno $TAG" \
+              --generate-notes \
+              --latest
+          fi
+
+      - name: Summary
+        shell: bash
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+          PACKAGE: ${{ steps.package.outputs.name }}
+        run: |
+          echo "### Zeno release built" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: $TAG" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Asset: $PACKAGE" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Zeno's updater can now detect this as the latest release." >> "$GITHUB_STEP_SUMMARY"

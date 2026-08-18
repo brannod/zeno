@@ -1,0 +1,9 @@
+# Zeno Discord bridge example configuration
+# Copy this file locally to DISCORD_TOKEN.txt and fill in your own values.
+# NEVER commit your real DISCORD_TOKEN.txt to GitHub.
+
+ENABLED=false
+TOKEN=DISCORD_BOT_TOKEN_HERE
+SERVER_ID=DISCORD_SERVER_ID_HERE
+CHANNEL_ID=DISCORD_CHANNEL_ID_HERE
+CHAT_ID=CURRENT

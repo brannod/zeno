@@ -1,0 +1,146 @@
+ZENO V2.7.21 - FIRST-TIME USER GUIDE
+===================================
+
+This guide is for a fresh 64-bit Windows 10 or Windows 11 computer. Follow it in
+order. After setup, README.txt is the compact complete reference.
+
+1. DOWNLOAD
+-----------
+- Python 3.10 or newer (64-bit): https://www.python.org/downloads/windows/
+- LM Studio for Windows: https://lmstudio.ai/download
+- The complete Zeno ZIP.
+
+Internet is needed for installation and public webpage research. Keep at least
+15 GB free for Python, LM Studio, a model, and Chromium. A GPU improves speed;
+LM Studio can use CPU/RAM more slowly.
+
+2. INSTALL PYTHON
+-----------------
+1. Run the official Python installer.
+2. Check "Add python.exe to PATH" on its first screen.
+3. Click Install Now, then Disable path length limit if offered.
+4. Press Windows+R, enter cmd, and run:
+
+     py -3 --version
+
+It must report Python 3.10 or newer. If Python is missing or Microsoft Store
+opens, reinstall from python.org with the PATH option checked.
+
+3. INSTALL LM STUDIO AND A MODEL
+--------------------------------
+1. Install and open LM Studio.
+2. In Discover / Models, search for:
+
+     huihui-qwen3-vl-4b-instruct-abliterated
+
+3. Download a GGUF quantization that fits the computer. Q4_K_M is a practical
+   starting point when available.
+   Optional: if your hardware can comfortably run it, also download
+   huihui-qwen3-vl-30b-a3b-instruct-abliterated for the Deep mode. Zeno falls
+   back to the loaded 4B model when the larger model is unavailable.
+4. Load it with at least a 16,384-token context; use 32,768 when memory allows.
+5. Open Developer / Local Server and start it at http://127.0.0.1:1234.
+6. Keep LM Studio and the Local Server open while using Zeno.
+
+If LM Studio reports insufficient memory, lower context, close GPU-heavy apps,
+or select a smaller model quantization.
+
+4. INSTALL ZENO
+---------------
+1. Extract the entire ZIP to a normal folder such as C:\Zeno. Do not run from
+   inside the ZIP preview.
+2. Open the extracted Zeno folder.
+3. Double-click INSTALL_ZENO.bat.
+4. Wait for "SUCCESS: Zeno dependencies are installed."
+
+This installs Zeno's Python packages, PDF support, Playwright, discord.py, and
+its private Chromium browser. Zeno listens only on the local computer, so
+public-network firewall access is unnecessary.
+
+5. START ZENO
+-------------
+1. Confirm the LM Studio model and Local Server are running.
+2. Double-click START_ZENO.bat and keep the black window open.
+3. Zeno opens at http://127.0.0.1:7860. Enter that address manually if needed.
+4. Confirm the sidebar says Local AI online.
+
+On the first upgraded startup, Zeno safely merges the reviewed durable preferences
+from the old Zeno project into long-term memory. Existing memories are preserved.
+Use the top History button to see every saved chat and the exact database path.
+Fast / Balanced / Deep is selected from the top bar. Background memory work now
+waits for 45 idle seconds and yields immediately when you send another message.
+
+6. RUN FIRST TESTS
+------------------
+Chat:
+1. Ask: "Say hello and tell me which model you are using."
+
+Web:
+1. Under Web, read https://example.com.
+2. Ask Zeno to summarize and cite the active page.
+
+Browser:
+1. Click Browser, enter a public URL, and click Go.
+2. Click, type, and scroll in the displayed page.
+3. Ask the vision sidebar what appears on screen.
+
+File batch and output:
+1. Upload two TXT lists containing one complete record per line.
+2. In Smart File Worker, Ctrl-click both files and choose Scramble Lines / Proxies.
+3. Click Run & deliver and watch the queue; use Preview only for manual review.
+4. After Completed and Validation Passed, download each result.
+5. Run one again and confirm Created by Zeno shows version history.
+
+Image/PDF:
+1. Upload a PNG/JPG screenshot or text-based PDF.
+2. Attach it to the next message and ask Zeno to describe or summarize it.
+
+Self-Dev safety tour (optional):
+1. Open Self-Dev from the top-right button and request one small improvement.
+2. Wait for Ready, expand every Before/After change, and do not apply unless it
+   is exactly what you intended.
+3. If applied, note the backup path. Restart when ready; Rollback restores it.
+
+Reuse an old Discord bot identity (optional):
+1. Stop the old bot process; one token must never run in both programs at once.
+2. Enable Discord Developer Mode and copy the text-channel ID. Server ID is optional,
+   and no Discord user ID is required. Enable Message Content Intent in Developer Portal.
+3. Edit DISCORD_TOKEN.txt beside Zeno. Enter the token and channel ID. Keep DISCORD_GUIDE.txt as the setup tutorial.
+   Server ID is optional. Set ENABLED=true and leave CHAT_ID=CURRENT.
+4. Open the Zeno conversation, then go to Setup > Zeno Discord Bridge and click
+   Reload + link current chat.
+5. Wait for Online. Everyone in that configured channel can now chat into the same
+   Zeno conversation. Use !help for Discord commands; !file, !stop, !profile, !scramble, !removedupes, and !clearfiles
+   support attached/replied-to text files and save their outputs into web Zeno too.
+
+7. KEEP WORK SAFE
+-----------------
+Zeno saves chats, settings, memory, presets, job history, and output versions in
+memory and zeno_data. Back up both folders together while Zeno is closed. Keep
+zeno_data\browser_profile private because it may contain cookies/site sessions.
+
+Self-Dev never applies automatically, but you should still read every proposed
+Before/After block. Keep the pre-apply backup until the changed Zeno version has
+been tested.
+
+8. TROUBLESHOOTING
+------------------
+- Disconnected: load the model and start LM Studio Local Server on port 1234,
+  then reload the page.
+- INSTALL_ZENO.bat fails: confirm internet and `py -3 --version`, then rerun it.
+- Module/Chromium missing: close Zeno and rerun INSTALL_ZENO.bat.
+- Black window closes: read its last visible error, correct it, and restart.
+- Page did not open: visit http://127.0.0.1:7860 manually.
+- Slow responses: GPU acceleration helps; CPU-only use is expected to be slower.
+- No old chat history: click History and read its saved-message count/path. Close
+  Zeno, copy the old memory folder and previous *_data folder into the new Zeno
+  folder, and restart. A standalone earlier .db can be placed beside zeno.py;
+  Zeno detects and imports the fuller database regardless of its old filename.
+- Memory housekeeping visible at the top is not blocking chat. It waits for 45
+  idle seconds and cancels/yields immediately when a new message arrives.
+- Job interrupted after restart: open Files > Queue & job history and Resume.
+- Discord bridge offline: stop the old bot, check DISCORD_GUIDE.txt,
+  token/IDs, Message Content Intent, and channel permissions, then reload it.
+
+Setup is complete. README.txt covers every tool, batches, error recovery, output
+versions, Self-Dev safeguards, Discord bridging, upgrades, privacy, and backups.

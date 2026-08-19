@@ -30,8 +30,9 @@ MAIN TOOLS
   its progress panel supports Pause, Resume, and Stop.
 - Live Browser: a persistent Chromium session with tabs, clicking, typing,
   scrolling, vision questions, and DeepSearch from the current public page.
-- Files: upload TXT/CSV/code/PDF/images, attach them to chat, download generated
-  files, and run the Smart File Worker.
+- Files: upload any file type up to 12 MB. Zeno directly reads common text/code,
+  PDF/DOCX/XLSX/PPTX/archive formats, analyzes images with vision, stores unknown
+  binary files safely as attachments, downloads generated files, and runs Smart File Worker.
 - Memory: manage remembered facts, save readable checkpoints, and export a ZIP.
 - Code: inspect, edit, preview, and export the public HTML/CSS/JavaScript workspace.
 - Self-Dev: plan, inspect, validate, approve, back up, apply, and roll back a
@@ -63,6 +64,15 @@ SPEED, MODEL ROUTING, CONTEXT, AND HISTORY
   memory folder plus its previous *_data folder into the new Zeno folder. Zeno
   automatically discovers the fuller earlier .db file, imports it as
   memory\zeno.db, and moves recognized saved data into zeno_data on restart.
+
+
+CHAT ATTACHMENTS + CLIPBOARD
+- Click the + button beside the message box to pick one or many files without leaving chat.
+- Ctrl+V in the message box pastes text normally. Ctrl+V with a screenshot, copied image, or copied file attaches it to the next message.
+- If focus is outside a text field, pasted plain text is routed into the Zeno message box instead of disappearing.
+- Drag-and-drop files onto the composer also attaches them.
+- Pasted/selected images are sent to Zeno as vision input when you send the message.
+- If you attach files and press Send with no text, Zeno uses a default analyze-the-attachments request.
 
 SMART FILE WORKER: RUN, DELIVER, BATCHES, AND QUEUE
 ---------------------------------------------------

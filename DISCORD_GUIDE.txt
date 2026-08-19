@@ -16,3 +16,7 @@ an alternate account to evade moderation, restrictions, or bans.
 
 The token file is intentionally separate from this guide. Keep DISCORD_TOKEN.txt private.
 Use !help in Discord for the complete current command list.
+
+
+NATURAL WEBSITE SCANS
+Paste a public website URL in Discord and explicitly say scan, crawl, research, or go through the next/all pages. Zeno will start DeepSearch automatically and mirror progress/results back into the shared chat.

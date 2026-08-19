@@ -91,8 +91,9 @@ File batch and output:
 4. After Completed and Validation Passed, download each result.
 5. Run one again and confirm Created by Zeno shows version history.
 
-Image/PDF:
-1. Upload a PNG/JPG screenshot or text-based PDF.
+Image/PDF/files:
+1. Use the + button beside chat or Ctrl+V to attach a PNG/JPG screenshot, copied image, PDF, document, spreadsheet, presentation, archive, or other file. Plain Ctrl+V text still pastes into the message box normally.
+2. Ask Zeno what you want analyzed. Images are sent through vision; readable files are extracted as evidence; unknown binaries stay attachable with metadata.
 2. Attach it to the next message and ask Zeno to describe or summarize it.
 
 Self-Dev safety tour (optional):

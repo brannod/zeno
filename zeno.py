@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Zeno V2.7.23: a private, screen-reader-first local AI assistant with Discord and Memory 2.0.
+"""Zeno V2.7.27: a private, screen-reader-first local AI assistant with Discord and Memory 2.0.
 
 The server binds only to 127.0.0.1. Chats, memories, pages, uploads, summaries,
 and the code workspace persist beside this script in SQLite/local data folders.
@@ -69,7 +69,7 @@ LEGACY_DISCORD_INFO_PATH = BASE_DIR / "DISCORD_BOT_INFO_HERE.txt"
 LEGACY_MEMORY_IMPORT_PATH = BASE_DIR / "ZENO_LEGACY_MEMORY_IMPORT.md"
 
 APP_NAME = "Zeno"
-APP_VERSION = "2.7.23"
+APP_VERSION = "2.7.27"
 SELFDEV_CORE_FILES = (
     "zeno.py", "app.html", "requirements.txt", "START_ZENO.bat", "INSTALL_ZENO.bat",
     "README.txt", "FIRST_TIME_USER_GUIDE.txt", "memory/README.txt",
@@ -98,6 +98,18 @@ CONTEXT_PAGE_LIMIT = 2
 CONTEXT_FILE_LIMIT = 2
 CONTEXT_WEB_CHAR_BUDGET = 8_000
 CONTEXT_FILE_CHAR_BUDGET = 6_000
+
+# Fast Context: normal chat is bounded by characters, not only message count.
+# This matters on CPU inference because a handful of giant assistant replies can
+# otherwise turn an 8-message window into an 8k+ token prompt.
+CHAT_HISTORY_CHAR_BUDGET_SIMPLE = 4_500
+CHAT_HISTORY_CHAR_BUDGET_NORMAL = 7_000
+CHAT_HISTORY_CHAR_BUDGET_TECHNICAL = 10_000
+CHAT_HISTORY_CHAR_BUDGET_DEEP = 14_000
+CHAT_HISTORY_PER_MESSAGE_CHAR_LIMIT = 3_200
+CHAT_MEMORY_CHAR_BUDGET = 1_600
+CHAT_SUMMARY_CHAR_BUDGET = 3_000
+
 BROWSER_AGENT_MAX_STEPS = 40
 BROWSER_AGENT_STEP_DELAY = 0.35
 FILE_JOB_CHUNK_LINES = 40
@@ -1582,7 +1594,7 @@ class LiveBrowserController:
         frame into a full browser snapshot job.
         """
         try:
-            raw = page.screenshot(type="jpeg", quality=62, caret="initial", timeout=2500)
+            raw = page.screenshot(type="jpeg", quality=58, caret="initial", timeout=2500)
         except Exception:
             return
         if not raw:
@@ -1874,7 +1886,7 @@ class LiveBrowserController:
             with sync_playwright() as pw:
                 while True:
                     try:
-                        action, values, result_queue = self.commands.get(timeout=0.22 if context is not None and page is not None else None)
+                        action, values, result_queue = self.commands.get(timeout=0.55 if context is not None and page is not None else None)
                     except queue.Empty:
                         if context is not None and page is not None and not page.is_closed():
                             self._capture_frame(page)
@@ -1951,7 +1963,7 @@ class LiveBrowserController:
                                 button = "left"
                             click_count = 2 if int(values.get("click_count", 1) or 1) >= 2 else 1
                             pages_before = {id(candidate) for candidate in context.pages}
-                            self._update(loading=True, error="")
+                            self._update(error="")
                             page.mouse.move(x, y)
                             page.mouse.click(x, y, button=button, click_count=click_count)
                             page.wait_for_timeout(120)
@@ -1970,7 +1982,7 @@ class LiveBrowserController:
                             if locator.count() < 1:
                                 raise ValueError("That browser element changed before Zeno could click it.")
                             pages_before = {id(candidate) for candidate in context.pages}
-                            self._update(loading=True, error="")
+                            self._update(error="")
                             locator.scroll_into_view_if_needed(timeout=5000)
                             locator.click(timeout=7000)
                             page.wait_for_timeout(120)
@@ -2922,7 +2934,7 @@ def discord_document_question(chat_id: int, instruction: str, raw: bytes, filena
         messages[0]["content"] += "\n\nDOCUMENT ATTACHMENT: Read the extracted document below as evidence for this exact request. Answer directly and do not claim the format is unsupported."
         messages.append({"role":"user","content":f"Request: {instruction}\nSource file: {filename}\n\nEXTRACTED DOCUMENT TEXT:\n{text[:100000]}"})
         _, _, chunks = stream_completion(
-            messages, model_stop, max_tokens=3000, user_message=instruction,
+            messages, model_stop, max_tokens=adaptive_output_token_limit(instruction), user_message=instruction,
             timeout_seconds=LM_LONG_GENERATION_TIMEOUT_SECONDS, request_class="file",
         )
         answer = sanitize_discord_answer("".join(chunks).strip(), instruction, no_code=conversation_response_directives(chat_id).get("no_code", False))
@@ -2936,8 +2948,56 @@ def discord_document_question(chat_id: int, instruction: str, raw: bytes, filena
 
 
 def discord_request_wants_document_output(instruction: str) -> bool:
-    text = str(instruction or "").casefold()
-    return bool(re.search(r"\b(edit|modify|change|convert|format|fix|fill|replace|remove|append|prepend|return|export|save)\b.{0,40}\b(file|docx|document|attachment)\b|\bmake (?:this|the) (?:file|docx|document)\b", text))
+    # Backward-compatible alias used by older call sites. Natural Discord attachments
+    # should only enter the file-transform bridge when the user actually asks Zeno to
+    # modify or return a file. Merely attaching a file means "read this as context".
+    return discord_attachment_wants_transform(instruction)
+
+
+def discord_attachment_wants_transform(instruction: str) -> bool:
+    """Return True only when a natural Discord attachment is meant to become an output file."""
+    text = re.sub(r"\s+", " ", str(instruction or "")).strip().casefold()
+    if not text:
+        return False
+
+    # Explicit requests for a returned/downloadable artifact always win.
+    if wants_downloadable_file(text):
+        return True
+    if re.search(
+        r"\b(send|give|return|export|save|download|attach|create|make|generate)\b.{0,50}"
+        r"\b(file|attachment|txt|csv|json|xlsx?|docx?|pdf|list)\b",
+        text,
+    ):
+        return True
+
+    # Deterministic whole-file transformations users commonly perform in Zeno.
+    if re.search(
+        r"\b(scramble|shuffle|randomi[sz]e|dedupe|de-duplicate|remove duplicates|"
+        r"convert|reformat|re-format|reorganize|re-organize|sort|append|prepend|replace)\b",
+        text,
+    ):
+        return True
+
+    # Edit/fix/clean language means transformation unless the request is clearly
+    # analytical (for example "check this file and tell me what is wrong").
+    analytical = bool(re.search(
+        r"\b(read|review|analy[sz]e|summari[sz]e|explain|tell me|what|why|check|compare|"
+        r"find|identify|look through|go through|study|inspect|here (?:is|are)|this is)\b",
+        text,
+    ))
+    if not analytical and re.search(r"\b(edit|modify|change|fix|clean|format|fill|organize)\b", text):
+        return True
+    return False
+
+
+def discord_attachment_mentions_reading(instruction: str) -> bool:
+    """Whether a reply to an older attachment clearly refers back to that file."""
+    text = re.sub(r"\s+", " ", str(instruction or "")).strip().casefold()
+    return bool(re.search(
+        r"\b(read|review|analy[sz]e|summari[sz]e|explain|check|compare|find|identify|inspect|"
+        r"study|look through|go through|this file|that file|attachment|document|txt|csv|json|pdf|docx)\b",
+        text,
+    ))
 
 
 def discord_file_bridge(chat_id: int, instruction: str, raw: bytes, filename: str,
@@ -3184,6 +3244,120 @@ def adaptive_recent_context_limit(user_message: str, configured_limit: int) -> i
     return min(configured, 8)
 
 
+
+def adaptive_history_char_budget(user_message: str) -> int:
+    """Hard character budget for prior dialogue injected into one model request."""
+    value = re.sub(r"\s+", " ", str(user_message or "")).strip().casefold()
+    explicit_deep = bool(re.search(
+        r"\b(all|entire|whole|everything|full|deep|detailed|thorough|comprehensive|"
+        r"review everything|go through|scan all|all pages|every page)\b", value
+    ))
+    technical = bool(re.search(
+        r"\b(code|error|traceback|debug|screen reader|discord|browser|database|memory|file|"
+        r"github|python|html|javascript|api|continue|previous|earlier|same issue)\b", value
+    ))
+    if explicit_deep or len(value) > 1_200:
+        return CHAT_HISTORY_CHAR_BUDGET_DEEP
+    if technical:
+        return CHAT_HISTORY_CHAR_BUDGET_TECHNICAL
+    if len(value) > 260:
+        return CHAT_HISTORY_CHAR_BUDGET_NORMAL
+    return CHAT_HISTORY_CHAR_BUDGET_SIMPLE
+
+
+def _history_is_low_value(role: str, content: str, source_label: str = "") -> bool:
+    """Exclude progress/status chatter that is useful to humans but useless to the next prompt."""
+    value = re.sub(r"\s+", " ", str(content or "")).strip().casefold()
+    label = str(source_label or "").strip().casefold()
+    if not value:
+        return True
+    if label == "deepsearch" and (
+        value.startswith("deepsearch progress")
+        or value.startswith("deepsearch started")
+        or value.startswith("deepsearch stopped before")
+    ):
+        return True
+    if role == "assistant" and (
+        value.startswith("🧹 context reset.")
+        or value.startswith("✅ zeno reply")
+        or value.startswith("⏳ zeno is ")
+        or value.startswith("🧠 zeno is processing")
+        or value.startswith("✍️ zeno is generating")
+    ):
+        return True
+    return False
+
+
+def trim_history_rows_for_prompt(rows: list[Any], user_message: str, chat_only: bool = False) -> list[dict[str, Any]]:
+    """Keep the newest useful history while enforcing a real size ceiling.
+
+    Input rows are expected newest-first (DESC). Output keeps that ordering so the
+    caller can reverse it when constructing chronological model messages.
+    """
+    budget = adaptive_history_char_budget(user_message)
+    technical_or_deep = budget >= CHAT_HISTORY_CHAR_BUDGET_TECHNICAL
+    per_message_limit = 4_200 if technical_or_deep else CHAT_HISTORY_PER_MESSAGE_CHAR_LIMIT
+    used = 0
+    kept: list[dict[str, Any]] = []
+    seen_exact: set[tuple[str, str]] = set()
+
+    for row in rows:
+        role = str(row["role"] or "user")
+        keys = set(row.keys()) if hasattr(row, "keys") else set(row)
+        source = str(row["source"] or "") if "source" in keys else ""
+        source_label = str(row["source_label"] or "") if "source_label" in keys else ""
+        raw = str(row["content"] or "")
+        if _history_is_low_value(role, raw, source_label):
+            continue
+
+        clean = sanitize_history_for_prompt(raw)
+        clean = re.sub(r"\n{4,}", "\n\n\n", clean).strip()
+        if not clean:
+            continue
+
+        exact_key = (role, _normalized_repeat_key(clean))
+        if exact_key[1] and exact_key in seen_exact:
+            continue
+        seen_exact.add(exact_key)
+
+        if len(clean) > per_message_limit:
+            clean = clean[:per_message_limit].rstrip() + "\n[older message trimmed for fast context]"
+
+        remaining = budget - used
+        if remaining <= 0:
+            break
+        if len(clean) > remaining:
+            if not kept and remaining >= 400:
+                clean = clean[:remaining].rstrip() + "\n[trimmed to context budget]"
+            else:
+                break
+
+        kept.append({
+            "id": int(row["id"]) if "id" in keys else 0,
+            "role": role,
+            "content": clean,
+            "source": source,
+            "source_label": source_label,
+        })
+        used += len(clean) + 2
+
+    return kept
+
+
+def adaptive_output_token_limit(user_message: str, *, downloadable_file: bool = False) -> int:
+    """Avoid reserving a 2,600-token answer for every tiny chat turn."""
+    if downloadable_file:
+        return 8_000
+    value = re.sub(r"\s+", " ", str(user_message or "")).strip().casefold()
+    if re.search(r"\b(long|detailed|thorough|comprehensive|in depth|in-depth|deep dive|step by step)\b", value):
+        return 2_600
+    if re.search(r"\b(code|debug|error|traceback|technical|explain|compare|review|analy[sz]e)\b", value) or len(value) > 500:
+        return 1_600
+    if len(value) < 120 and not re.search(r"\b(list|guide|how|why|what should|recommend)\b", value):
+        return 800
+    return 1_200
+
+
 def query_requests_page_context(query: str) -> bool:
     return bool(re.search(r"(?i)\b(web(?:site|page)?|page|site|url|link|browser|source|article|online|internet)\b", str(query or "")))
 
@@ -3262,22 +3436,23 @@ def estimate_context_usage(chat_id: int) -> dict[str, Any]:
     with db_connect() as db:
         chat = db.execute("SELECT summary,summary_until_id FROM chats WHERE id=?", (chat_id,)).fetchone()
         summary_until = int(chat["summary_until_id"] or 0) if chat else 0
-        history_rows = db.execute(
-            "SELECT role,content FROM messages WHERE chat_id=? AND id>? ORDER BY id DESC LIMIT ?",
-            (chat_id, summary_until, recent_limit),
+        raw_history_rows = db.execute(
+            "SELECT id,role,content,source,source_label FROM messages WHERE chat_id=? AND id>? ORDER BY id DESC LIMIT ?",
+            (chat_id, summary_until, min(80, max(recent_limit * 3, recent_limit))),
         ).fetchall()
-        recent_user = next((str(row["content"]) for row in history_rows if str(row["role"]) == "user"), "current conversation")
+        recent_user = next((str(row["content"]) for row in raw_history_rows if str(row["role"]) == "user"), "current conversation")
+    history_rows = trim_history_rows_for_prompt(raw_history_rows, recent_user, chat_only=False)
     relevant_memories = retrieve_relevant_memories(recent_user, touch=False)
     pages = select_context_pages(chat_id, recent_user)
     files = select_context_files(chat_id, recent_user, [])
-    memory_chars = min(6_000, sum(len(str(row["content"])) + 3 for row in relevant_memories))
+    memory_chars = min(CHAT_MEMORY_CHAR_BUDGET, sum(len(str(row["content"])) + 3 for row in relevant_memories))
     page_chars = min(CONTEXT_WEB_CHAR_BUDGET, sum(min(5_000, len(str(row["page_text"]))) for row in pages))
     file_chars = min(CONTEXT_FILE_CHAR_BUDGET, sum(min(5_000, len(str(row["extracted_text"]))) for row in files if row["kind"] != "image"))
     components = {
         "instructions": len(get_setting("personality", DEFAULT_PERSONALITY)) + 3_800,
         "memory": memory_chars,
-        "summary": min(8_000, len(str(chat["summary"] or "")) if chat else 0),
-        "recent_chat": sum(min(6_000, len(str(row["content"]))) for row in history_rows),
+        "summary": min(CHAT_SUMMARY_CHAR_BUDGET, len(str(chat["summary"] or "")) if chat else 0),
+        "recent_chat": sum(len(str(row["content"])) for row in history_rows),
         "web": page_chars,
         "files": file_chars,
     }
@@ -3597,22 +3772,24 @@ def build_prompt(chat_id: int, user_message: str, file_ids: list[int],
         pages: list[sqlite3.Row] = []
         files: list[sqlite3.Row] = []
         summary_until = int(chat["summary_until_id"] or 0) if chat else 0
+        history_fetch_limit = min(80, max(recent_context_messages * 3, recent_context_messages))
         if history_before_id:
-            history = db.execute(
+            raw_history = db.execute(
                 "SELECT id,role,content,source,source_label FROM messages WHERE chat_id=? AND id>? AND id<? AND id!=? "
                 "ORDER BY id DESC LIMIT ?",
-                (chat_id, summary_until, history_before_id, skip_message_id, recent_context_messages),
+                (chat_id, summary_until, history_before_id, skip_message_id, history_fetch_limit),
             ).fetchall()
         else:
-            history = db.execute(
+            raw_history = db.execute(
                 "SELECT id,role,content,source,source_label FROM messages WHERE chat_id=? AND id>? AND id!=? "
-                "ORDER BY id DESC LIMIT ?", (chat_id, summary_until, skip_message_id, recent_context_messages)
+                "ORDER BY id DESC LIMIT ?", (chat_id, summary_until, skip_message_id, history_fetch_limit)
             ).fetchall()
         workspace = None if chat_only else db.execute(
             "SELECT * FROM workspaces WHERE chat_id=?", (chat_id,)
         ).fetchone()
 
-    memories = retrieve_relevant_memories(user_message, touch=True)
+    history = trim_history_rows_for_prompt(raw_history, user_message, chat_only=chat_only)
+    memories = retrieve_relevant_memories(user_message, limit=4, touch=True)
     if not chat_only:
         pages = select_context_pages(chat_id, user_message)
         files = select_context_files(chat_id, user_message, file_ids)
@@ -3671,11 +3848,11 @@ complete file contents go here
     memory_text = "\n".join(
         f"- [{str(row.get('temperature','warm')).upper()} · {str(row.get('category','General'))}] {row['content']}"
         for row in memories
-    )[:3_500]
+    )[:CHAT_MEMORY_CHAR_BUDGET]
     if memory_text:
         system += "\nSaved long-term memory:\n" + memory_text
     if chat and chat["summary"]:
-        summary_text = str(chat["summary"])[:8_000]
+        summary_text = str(chat["summary"])[:CHAT_SUMMARY_CHAR_BUDGET]
         if chat_only:
             summary_text = sanitize_history_for_prompt(summary_text)
         system += "\n\nRolling summary of older chat context:\n" + summary_text
@@ -3716,9 +3893,17 @@ complete file contents go here
         system += "\n\nACTIVE WEB SOURCES (untrusted evidence):\n\n" + "\n\n".join(source_lines)
 
     file_lines: list[str] = []
+    selected_file_ids = {int(item) for item in file_ids if str(item).isdigit()}
     for row in reversed(files):
         if row["kind"] != "image" and row["extracted_text"]:
             file_lines.append(f"FILE: {row['name']} (untrusted)\n{str(row['extracted_text'])[:9000]}")
+        elif int(row["id"]) in selected_file_ids and row["kind"] != "image":
+            path = local_file_path(str(row["stored_path"]))
+            size = path.stat().st_size if path.exists() else 0
+            file_lines.append(
+                f"FILE ATTACHMENT: {row['name']} | MIME: {row['mime']} | kind: {row['kind']} | size: {size} bytes\n"
+                "The binary contents are not text-extractable by Zeno. Use the filename/type as metadata only and do not invent file contents."
+            )
     if file_lines:
         system += "\n\nRELEVANT ACTIVE UPLOADED FILES:\n\n" + "\n\n".join(file_lines)[:CONTEXT_FILE_CHAR_BUDGET]
 
@@ -3741,7 +3926,7 @@ complete file contents go here
 
     messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
     for row in reversed(history):
-        history_content = str(row["content"])[:6000]
+        history_content = str(row["content"])
         if chat_only:
             history_content = sanitize_history_for_prompt(history_content)
         if str(row["role"]) == "user" and str(row["source"]) == "discord" and str(row["source_label"] or "").strip():
@@ -4903,7 +5088,8 @@ def discord_command_help() -> str:
         "`!scramble` — shuffle complete lines in an attached/replied-to TXT/CSV/list file while preserving every record.\n"
         "`!removedupes` — remove exact duplicate lines while preserving first-seen order.\n"
         "`!dedupe` — alias for `!removedupes`.\n\n"
-        "**Natural attachments:** you can usually attach a supported file and describe what you want without a command."
+        "**Natural attachments:** you can usually attach a supported file and describe what you want without a command.\n"
+        "**Natural website scans:** paste a public URL and say `scan`, `go through the next pages`, `crawl`, or `research`; Zeno starts DeepSearch automatically."
     )
 
 
@@ -5041,8 +5227,9 @@ def process_discord_chat(chat_id: int, content: str, author_id: str, author_name
         messages[0]["content"] += """
 
 Discord shared-chat bridge rules:
-- Normal Discord chat is conversation-only. Never start or claim to start browsing, DeepSearch, arbitrary files,
-  Self-Dev, code changes, purchases, account actions, or any browser/computer tool.
+- Normal Discord chat is conversation-only. Explicit URL scan/crawl requests are routed to Zeno DeepSearch before reaching this model.
+- Never claim to start browsing, DeepSearch, arbitrary files, Self-Dev, code changes, purchases, account actions,
+  or browser/computer tools from inside a normal model reply.
 - Safe local Discord utility commands such as !file, !scramble, and !removedupes are handled outside the model.
 - Answer once, then stop. Do not append command suggestions, usage examples, tips, menus, repeated alternatives,
   file-capability notices, or "Want me to..." sections unless the user explicitly asks for them.
@@ -5061,7 +5248,7 @@ Discord shared-chat bridge rules:
         # about a percentage if the native endpoint is unavailable.
         try:
             _, _, chunks = stream_completion_native_progress(
-                messages, model_stop, max_tokens=2600, user_message=content,
+                messages, model_stop, max_tokens=adaptive_output_token_limit(content), user_message=content,
                 timeout_seconds=LM_LONG_GENERATION_TIMEOUT_SECONDS, request_class="chat",
                 progress_callback=_discord_model_progress,
             )
@@ -5072,7 +5259,7 @@ Discord shared-chat bridge rules:
                 "Prompt progress unavailable; Zeno is using compatibility mode",
             )
             _, _, chunks = stream_completion(
-                messages, model_stop, max_tokens=2600, user_message=content,
+                messages, model_stop, max_tokens=adaptive_output_token_limit(content), user_message=content,
                 timeout_seconds=LM_LONG_GENERATION_TIMEOUT_SECONDS, request_class="chat",
             )
             answer = "".join(chunks).strip()
@@ -5524,14 +5711,39 @@ class DiscordChatBridge:
                                 pass
                         discord_reply_progress_clear(key)
 
+            async def _natural_web_request(self, message: Any, content: str, author_name: str, external_id: str) -> bool:
+                request = natural_deepsearch_request(content)
+                if request is None:
+                    return False
+                await asyncio.to_thread(
+                    append_chat_message, chat_id, "user", content,
+                    source="discord", source_label=author_name, external_id=external_id,
+                )
+                contextual_goal = await asyncio.to_thread(
+                    deepsearch_goal_with_chat_context, chat_id, str(request["goal"])
+                )
+                job_id = await asyncio.to_thread(
+                    start_deepsearch, chat_id, str(request["url"]), contextual_goal,
+                    int(request["page_limit"]), int(request["max_depth"]),
+                )
+                mode = "all-pages pagination crawl" if bool(request.get("exhaustive")) else "site scan"
+                await message.reply(
+                    f"🌐 **Zeno {mode} started** · job `{job_id[:8]}`\n"
+                    f"Page cap: **{int(request['page_limit']):,}** · depth: **{int(request['max_depth'])}**\n"
+                    "I’ll follow safe same-site pagination/links, dedupe pages, and post the sourced result back here.",
+                    mention_author=False, allowed_mentions=discord.AllowedMentions.none(),
+                )
+                return True
+
             async def _natural_file_request(self, message: Any, content: str, author_name: str, external_id: str) -> bool:
                 current_attachments = list(getattr(message, "attachments", []) or [])
                 attachment_obj = await self._command_attachment(message)
                 if attachment_obj is None:
                     return False
                 if not current_attachments:
-                    # A simple reply like "thanks" to an old file should remain normal conversation.
-                    if not re.search(r"(?i)\b(scramble|shuffle|randomi[sz]e|clean|fix|edit|change|convert|format|remove|dedupe|sort|append|prepend|add|replace|extract|make|transform|organize|reorganize)\b", content):
+                    # A simple reply like "thanks" to an old attachment remains normal conversation.
+                    # But explicit read/analyze OR transform wording may intentionally refer to the replied file.
+                    if not (discord_attachment_mentions_reading(content) or discord_attachment_wants_transform(content)):
                         return False
                 if int(getattr(attachment_obj, "size", 0) or 0) > MAX_UPLOAD_BYTES:
                     raise ValueError(f"That attachment is over Zeno's {MAX_UPLOAD_BYTES // 1_000_000} MB Discord limit.")
@@ -5541,22 +5753,33 @@ class DiscordChatBridge:
                 raw = await attachment_obj.read()
                 filename = str(getattr(attachment_obj, "filename", "discord-file.txt") or "discord-file.txt")
                 suffix = Path(filename).suffix.casefold()
-                if suffix in {".docx", ".pdf"} and not discord_request_wants_document_output(instruction):
+                wants_transform = discord_attachment_wants_transform(instruction)
+
+                # Natural attachment default: READ/ANALYZE. The old router sent every TXT/CSV/JSON
+                # attachment into discord_file_bridge(), which forced the model to invent a zeno-file
+                # block even when the user only supplied reference material.
+                if not wants_transform and suffix not in IMAGE_EXTENSIONS:
                     card = await self._progress_card(message, f"Reading `{filename}`")
                     self.activity_override = f"Reading {filename[:60]}"
                     try:
                         async with message.channel.typing():
-                            answer = await asyncio.to_thread(discord_document_question, chat_id, instruction, raw, filename, author_name, external_id, threading.Event())
+                            answer = await asyncio.to_thread(
+                                discord_document_question, chat_id, instruction, raw, filename,
+                                author_name, external_id, threading.Event()
+                            )
                         sent = None
                         for chunk in discord_message_chunks(answer):
-                            sent = await message.reply(chunk, mention_author=False, allowed_mentions=discord.AllowedMentions.none())
+                            sent = await message.reply(
+                                chunk, mention_author=False, allowed_mentions=discord.AllowedMentions.none()
+                            )
                         await self._finish_progress_card(card, f"✅ Read `{filename}`")
                         if sent is not None:
                             await self._safe_reactions(sent)
                         return True
                     finally:
                         self.activity_override = ""
-                card = await self._progress_card(message, f"Processing `{filename}` · natural file request")
+
+                card = await self._progress_card(message, f"Processing `{filename}` · file transform")
                 self.activity_override = f"Processing {filename[:60]}"
                 stop_event = threading.Event()
                 try:
@@ -5870,6 +6093,12 @@ class DiscordChatBridge:
                             bridge._set_status(
                                 "online",
                                 f"Shared chat + commands connected to #{getattr(message.channel, 'name', channel_id)}.",
+                                str(self.user or ""),
+                            )
+                            return
+                        if await self._natural_web_request(message, content, author_name, external_id):
+                            bridge._set_status(
+                                "online", f"Shared chat + website scans connected to #{getattr(message.channel, 'name', channel_id)}.",
                                 str(self.user or ""),
                             )
                             return
@@ -6776,6 +7005,115 @@ def deepsearch_keywords(goal: str) -> list[str]:
     return list(dict.fromkeys(word for word in words if word not in DEEPSEARCH_STOPWORDS))[:18]
 
 
+
+EXHAUSTIVE_WEB_RE = re.compile(
+    r"(?i)\b(?:all|every|entire|whole)\s+(?:the\s+)?(?:pages?|site|website)|"
+    r"\b(?:go|look|read|scan|search|crawl|browse)\s+through\s+(?:all|every|the\s+next|the)?\s*(?:pages?|site|website)|"
+    r"\bnext\s+pages?\b|\bpage\s+by\s+page\b"
+)
+
+
+def deepsearch_exhaustive_intent(goal: str) -> bool:
+    return bool(EXHAUSTIVE_WEB_RE.search(str(goal or "")))
+
+
+def deepsearch_is_pagination_link(item: dict[str, Any]) -> bool:
+    label = re.sub(r"\s+", " ", str(item.get("text", ""))).strip().casefold()
+    url = canonical_crawl_url(str(item.get("url", "")))
+    if re.search(r"^(?:next|next page|older|more|more results|load more|›|»|→)$", label):
+        return True
+    if re.search(r"\b(?:next|page\s*\d+|older results|more results)\b", label):
+        return True
+    try:
+        parsed = urllib.parse.urlsplit(url)
+        query = {str(k).casefold(): v for k, v in urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)}
+    except Exception:
+        return False
+    for key in ("page", "p", "pg", "offset", "start"):
+        if key in query:
+            return True
+    path = urllib.parse.unquote(parsed.path).casefold()
+    return bool(re.search(r"/(?:page|p)/?\d+(?:/|$)|[-_/]page[-_/]?\d+(?:/|$)", path))
+
+
+def natural_deepsearch_request(text: str) -> dict[str, Any] | None:
+    """Recognize an explicit natural-language request to crawl a public website."""
+    value = str(text or "").strip()
+    url_match = re.search(r"https?://[^\s<>()\[\]{}]+", value, flags=re.I)
+    if not url_match:
+        return None
+    intent = bool(re.search(
+        r"(?i)\b(scan|crawl|browse|research|review|search|look through|go through|"
+        r"read through|check the site|check the website|scan the site|scan the website|"
+        r"next pages?|all pages?|every page|entire site|whole site)\b", value
+    ))
+    if not intent:
+        return None
+
+    url = url_match.group(0).rstrip(".,;:!?)]}")
+    exhaustive = deepsearch_exhaustive_intent(value)
+    page_match = re.search(r"(?i)\b(?:up to\s+)?(\d{1,4})\s+pages?\b", value)
+    if page_match:
+        page_limit = max(2, min(int(page_match.group(1)), DEEPSEARCH_MAX_PAGES))
+    else:
+        page_limit = DEEPSEARCH_MAX_PAGES if exhaustive else 60
+    return {
+        "url": url,
+        "goal": value[:4000],
+        "page_limit": page_limit,
+        "max_depth": 4 if exhaustive else 3,
+        "exhaustive": exhaustive,
+    }
+
+
+
+def deepsearch_goal_with_chat_context(chat_id: int, request_text: str) -> str:
+    """Resolve phrases like 'we haven't listed' without dumping the whole chat into DeepSearch."""
+    request = re.sub(r"\s+", " ", str(request_text or "")).strip()
+    if not re.search(
+        r"(?i)\b(we (?:have not|haven't)|already|previous(?:ly)?|earlier|before|those|these|same|"
+        r"listed|mentioned|talked about|don't know|do not know)\b",
+        request,
+    ):
+        return request[:4000]
+
+    with db_connect() as db:
+        rows = db.execute(
+            "SELECT role,content,source_label FROM messages WHERE chat_id=? "
+            "ORDER BY id DESC LIMIT 10", (chat_id,)
+        ).fetchall()
+
+    context_parts: list[str] = []
+    used = 0
+    request_key = _normalized_repeat_key(request)
+    for row in rows:
+        raw = str(row["content"] or "")
+        if _normalized_repeat_key(raw) == request_key:
+            continue
+        if _history_is_low_value(str(row["role"] or ""), raw, str(row["source_label"] or "")):
+            continue
+        clean = sanitize_history_for_prompt(raw).strip()
+        if not clean:
+            continue
+        clean = clean[:900]
+        if used + len(clean) > 2_300:
+            break
+        label = "User" if str(row["role"]) == "user" else "Zeno"
+        context_parts.append(f"{label}: {clean}")
+        used += len(clean)
+
+    if not context_parts:
+        return request[:4000]
+    context_parts.reverse()
+    combined = (
+        request
+        + "\n\nRECENT CHAT CONTEXT (use only to resolve references such as already-listed items; "
+          "website evidence still controls factual claims):\n"
+        + "\n".join(context_parts)
+    )
+    return combined[:4000]
+
+
 def deepsearch_link_score(goal: str, item: dict[str, Any]) -> float:
     label = str(item.get("text", "")).casefold()
     url = str(item.get("url", "")).casefold()
@@ -6788,6 +7126,8 @@ def deepsearch_link_score(goal: str, item: dict[str, Any]) -> float:
         score += 0.75
     if any(part in label for part in ("privacy", "terms", "cookie", "login", "sign in", "register")):
         score -= 6.0
+    if deepsearch_is_pagination_link(item):
+        score += 120.0 if deepsearch_exhaustive_intent(goal) else 20.0
     return score
 
 
@@ -6804,6 +7144,7 @@ def deepsearch_candidates(page: dict[str, Any], goal: str, root_host: str,
             "url": canonical,
             "text": re.sub(r"\s+", " ", str(item.get("text", ""))).strip()[:160] or canonical,
             "score": deepsearch_link_score(goal, item),
+            "pagination": deepsearch_is_pagination_link(item),
         })
     candidates.sort(key=lambda item: (-float(item["score"]), len(str(item["url"]))))
     return candidates[:50]
@@ -6883,7 +7224,11 @@ def deepsearch_choose_links(goal: str, page: dict[str, Any], candidates: list[di
         selected.append({**item, "reason": re.sub(r"\s+", " ", str(choice.get("reason", ""))).strip()[:240]})
         if len(selected) >= max_choices:
             break
-    enough_evidence = bool(parsed.get("enough_evidence")) and len(visited_pages) >= 2
+    enough_evidence = (
+        bool(parsed.get("enough_evidence"))
+        and len(visited_pages) >= 2
+        and not deepsearch_exhaustive_intent(goal)
+    )
     if not selected and not enough_evidence:
         selected = [{**item, "reason": "Best keyword match to the research goal."}
                     for item in candidates[:max_choices]]
@@ -7020,7 +7365,7 @@ def deepsearch_sources(pages: list[dict[str, Any]], goal: str) -> tuple[list[dic
     return sources, "\n\n".join(blocks)
 
 
-def deepsearch_report(goal: str, start_url: str, pages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]]]:
+def deepsearch_report(goal: str, start_url: str, pages: list[dict[str, Any]], coverage_note: str = "") -> tuple[str, list[dict[str, Any]]]:
     sources, evidence = deepsearch_sources(pages, goal)
     messages = [
         {"role": "system", "content": (
@@ -7031,12 +7376,16 @@ def deepsearch_report(goal: str, start_url: str, pages: list[dict[str, Any]]) ->
         )},
         {"role": "user", "content": (
             f"RESEARCH GOAL:\n{goal}\n\nSTARTING WEBSITE:\n{start_url}\n\n"
-            f"PAGES VISITED: {len(pages)}\n\nWEBSITE EVIDENCE:\n{evidence}"
+            f"PAGES VISITED: {len(pages)}\n"
+            f"EXHAUSTIVE/PAGINATION REQUEST: {'yes' if deepsearch_exhaustive_intent(goal) else 'no'}\n"
+            f"CRAWL COVERAGE: {coverage_note or 'not reported'}\n\n"
+            f"WEBSITE EVIDENCE:\n{evidence}"
         )},
     ]
-    return nonstream_completion(
+    report = nonstream_completion(
         messages, max_tokens=2800, temperature=0.15, model_mode="deep"
-    ), sources
+    )
+    return _collapse_repeated_paragraphs(report), sources
 
 
 def save_deepsearch_report(chat_id: int, goal: str, start_url: str, report: str,
@@ -7074,6 +7423,7 @@ def run_deepsearch(job_id: str) -> None:
         goal = str(job["goal"])
         page_limit = int(job["page_limit"])
         max_depth = int(job["max_depth"])
+        exhaustive = deepsearch_exhaustive_intent(goal)
         robots = deepsearch_load_robots(start_url)
         if robots:
             deepsearch_log(job_id, "Loaded this website's robots.txt rules.")
@@ -7156,30 +7506,50 @@ def run_deepsearch(job_id: str) -> None:
 
             if not deepsearch_checkpoint(job_id, controls):
                 return
-            if int(next_item["depth"]) >= max_depth:
+            if int(next_item["depth"]) >= max_depth and not exhaustive:
                 deepsearch_log(job_id, f"Reached the selected depth limit at {page['url']}.", "info")
                 continue
             excluded = visited | queued
             candidates = deepsearch_candidates(page, goal, root_host, excluded)
-            deepsearch_update(
-                job_id, stage="AI choosing next page",
-                detail=f"Zeno is comparing {len(candidates)} safe same-site links against the research goal.",
-                progress=min(82, 8 + int(70 * len(visited_pages) / max(1, page_limit))),
-            )
-            decision = deepsearch_choose_links(goal, page, candidates, visited_pages)
+            pagination_candidates = [item for item in candidates if bool(item.get("pagination"))]
+            if exhaustive and pagination_candidates:
+                selected_items = [
+                    {**item, "reason": "Pagination link queued for complete site coverage."}
+                    for item in pagination_candidates[:8]
+                ]
+                decision = {
+                    "selected": selected_items,
+                    "enough_evidence": False,
+                    "reason": f"Queued {len(selected_items)} pagination link(s) without an AI planning call.",
+                }
+                deepsearch_update(
+                    job_id, stage="Following pagination",
+                    detail=f"Zeno found {len(pagination_candidates)} pagination link(s) and is continuing page-by-page.",
+                    progress=min(82, 8 + int(70 * len(visited_pages) / max(1, page_limit))),
+                )
+            else:
+                deepsearch_update(
+                    job_id, stage="Choosing next page",
+                    detail=f"Zeno is comparing {len(candidates)} safe same-site links against the research goal.",
+                    progress=min(82, 8 + int(70 * len(visited_pages) / max(1, page_limit))),
+                )
+                decision = deepsearch_choose_links(goal, page, candidates, visited_pages)
+
             overall_reason = str(decision.get("reason", ""))
             if overall_reason:
-                deepsearch_log(job_id, f"AI assessment: {overall_reason}", "decision")
-            if decision.get("enough_evidence") and len(visited_pages) >= 2:
+                deepsearch_log(job_id, f"Navigation assessment: {overall_reason}", "decision")
+            if decision.get("enough_evidence") and len(visited_pages) >= 2 and not exhaustive:
                 deepsearch_log(job_id, "Zeno decided it has enough evidence to answer the research goal.", "success")
                 break
             for selected in decision.get("selected", []):
                 selected_url = str(selected["url"])
                 if selected_url in visited or selected_url in queued:
                     continue
+                is_pagination = bool(selected.get("pagination"))
+                next_depth = int(next_item["depth"]) if is_pagination else int(next_item["depth"]) + 1
                 frontier.append({
-                    "url": selected_url, "depth": int(next_item["depth"]) + 1,
-                    "score": 100.0 + float(selected.get("score", 0.0)),
+                    "url": selected_url, "depth": next_depth,
+                    "score": (260.0 if is_pagination else 100.0) + float(selected.get("score", 0.0)),
                     "reason": selected.get("reason") or "Selected by Zeno for the research goal.",
                     "order": order,
                 })
@@ -7202,8 +7572,23 @@ def run_deepsearch(job_id: str) -> None:
             job_id, stage="Writing report", detail=f"Analyzing {len(visited_pages)} visited pages and adding citations.",
             queued_links=len(frontier), progress=88,
         )
+        if frontier and len(visited_pages) >= page_limit:
+            coverage_note = (
+                f"Page cap reached at {len(visited_pages)} page(s) with {len(frontier)} queued same-site link(s) remaining. "
+                "This is a partial crawl."
+            )
+        elif frontier:
+            coverage_note = (
+                f"Navigation stopped with {len(frontier)} queued link(s) remaining. "
+                "Do not describe this as full-site coverage."
+            )
+        else:
+            coverage_note = (
+                f"Zeno exhausted the safe same-site link queue after {len(visited_pages)} page(s). "
+                "Coverage is complete for discoverable links within the selected crawl rules, not a guarantee of hidden/infinite-scroll pages."
+            )
         deepsearch_log(job_id, "Navigation finished. Zeno is writing the sourced report.", "success")
-        report, citations = deepsearch_report(goal, start_url, visited_pages)
+        report, citations = deepsearch_report(goal, start_url, visited_pages, coverage_note)
         if controls["stop"].is_set():
             deepsearch_update(job_id, status="stopped", stage="Stopped", detail="Stopped by the user.")
             deepsearch_log(job_id, "DeepSearch stopped before saving the final report.", "warn")
@@ -7212,7 +7597,7 @@ def run_deepsearch(job_id: str) -> None:
         save_deepsearch_report(int(job["chat_id"]), goal, start_url, report, citations)
         deepsearch_update(
             job_id, status="completed", stage="Complete",
-            detail=f"DeepSearch completed with {len(visited_pages)} page(s) and {len(citations)} citation(s).",
+            detail=f"DeepSearch completed with {len(visited_pages)} page(s) and {len(citations)} citation(s). {coverage_note}",
             pages_fetched=len(visited_pages), queued_links=len(frontier), errors=errors, current_url="",
             progress=100, report=report, citations_json=json.dumps(citations),
         )
@@ -7260,11 +7645,19 @@ def start_deepsearch(chat_id: int, start_url: str, goal: str, page_limit: int,
     return job_id
 
 
+def _bounded_zip_member(archive: zipfile.ZipFile, member: str, max_bytes: int = 5_000_000) -> bytes:
+    info = archive.getinfo(member)
+    if int(info.file_size or 0) > max_bytes:
+        raise ValueError(f"Archive member is too large to inspect safely: {member}")
+    return archive.read(member)
+
+
 def extract_upload(name: str, mime: str, raw: bytes) -> tuple[str, str]:
     suffix = Path(name).suffix.casefold()
-    if suffix in IMAGE_EXTENSIONS or mime.startswith("image/"):
+    mime_lower = str(mime or "").casefold()
+    if suffix in IMAGE_EXTENSIONS or mime_lower.startswith("image/"):
         return "image", ""
-    if suffix == ".pdf" or mime == "application/pdf":
+    if suffix == ".pdf" or mime_lower == "application/pdf":
         if not pypdf_available():
             raise ValueError("PDF support needs pypdf. Run INSTALL_ZENO.bat once.")
         from pypdf import PdfReader
@@ -7274,7 +7667,7 @@ def extract_upload(name: str, mime: str, raw: bytes) -> tuple[str, str]:
         except Exception as exc:
             raise ValueError(f"Could not read that PDF: {exc}") from exc
         return "pdf", text[:100_000]
-    if suffix == ".docx" or mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    if suffix == ".docx" or mime_lower == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
         try:
             with zipfile.ZipFile(io.BytesIO(raw), "r") as archive:
                 members = ["word/document.xml"] + sorted(
@@ -7286,12 +7679,12 @@ def extract_upload(name: str, mime: str, raw: bytes) -> tuple[str, str]:
                 for member in members:
                     if member not in available:
                         continue
-                    xml_root = ET.fromstring(archive.read(member))
+                    xml_root = ET.fromstring(_bounded_zip_member(archive, member))
                     paragraphs = []
                     for para in xml_root.iter(ns + "p"):
-                        text = "".join((node.text or "") for node in para.iter(ns + "t")).strip()
-                        if text:
-                            paragraphs.append(text)
+                        value = "".join((node.text or "") for node in para.iter(ns + "t")).strip()
+                        if value:
+                            paragraphs.append(value)
                     if paragraphs:
                         chunks.append("\n".join(paragraphs))
                 text = "\n\n".join(chunks).strip()
@@ -7300,9 +7693,91 @@ def extract_upload(name: str, mime: str, raw: bytes) -> tuple[str, str]:
         if not text:
             raise ValueError("That DOCX did not contain readable text.")
         return "docx", text[:100_000]
-    if suffix in TEXT_EXTENSIONS or mime.startswith("text/"):
+    if suffix == ".pptx" or "presentationml.presentation" in mime_lower:
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw), "r") as archive:
+                members = sorted(
+                    (n for n in archive.namelist() if re.fullmatch(r"ppt/slides/slide\d+\.xml", n)),
+                    key=lambda n: int(re.search(r"slide(\d+)", n).group(1)),
+                )[:300]
+                chunks = []
+                for index, member in enumerate(members, 1):
+                    root = ET.fromstring(_bounded_zip_member(archive, member))
+                    values = [str(node.text or "").strip() for node in root.iter() if node.tag.endswith("}t") and str(node.text or "").strip()]
+                    if values:
+                        chunks.append(f"SLIDE {index}\n" + "\n".join(values))
+                text = "\n\n".join(chunks).strip()
+        except Exception as exc:
+            raise ValueError(f"Could not read that PPTX: {exc}") from exc
+        return "pptx", text[:100_000]
+    if suffix == ".xlsx" or "spreadsheetml.sheet" in mime_lower:
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw), "r") as archive:
+                names = set(archive.namelist())
+                shared: list[str] = []
+                if "xl/sharedStrings.xml" in names:
+                    root = ET.fromstring(_bounded_zip_member(archive, "xl/sharedStrings.xml"))
+                    for item in root.iter():
+                        if item.tag.endswith("}si"):
+                            shared.append("".join((node.text or "") for node in item.iter() if node.tag.endswith("}t")))
+                sheets = sorted(
+                    (n for n in names if re.fullmatch(r"xl/worksheets/sheet\d+\.xml", n)),
+                    key=lambda n: int(re.search(r"sheet(\d+)", n).group(1)),
+                )[:100]
+                chunks = []
+                for sheet_index, member in enumerate(sheets, 1):
+                    root = ET.fromstring(_bounded_zip_member(archive, member))
+                    rows_out = []
+                    for row in (node for node in root.iter() if node.tag.endswith("}row")):
+                        cells = []
+                        for cell in (node for node in list(row) if node.tag.endswith("}c")):
+                            ref = str(cell.attrib.get("r") or "")
+                            cell_type = str(cell.attrib.get("t") or "")
+                            value_node = next((node for node in cell.iter() if node.tag.endswith("}v")), None)
+                            inline_nodes = [node for node in cell.iter() if node.tag.endswith("}t")]
+                            value = ""
+                            if cell_type == "inlineStr" and inline_nodes:
+                                value = "".join((node.text or "") for node in inline_nodes)
+                            elif value_node is not None and value_node.text is not None:
+                                value = value_node.text
+                                if cell_type == "s":
+                                    try:
+                                        value = shared[int(value)]
+                                    except Exception:
+                                        pass
+                                elif cell_type == "b":
+                                    value = "TRUE" if value == "1" else "FALSE"
+                            if value:
+                                cells.append(f"{ref}={value}" if ref else value)
+                        if cells:
+                            rows_out.append(" | ".join(cells))
+                        if sum(len(x) for x in rows_out) > 90_000:
+                            break
+                    if rows_out:
+                        chunks.append(f"SHEET {sheet_index}\n" + "\n".join(rows_out))
+                text = "\n\n".join(chunks).strip()
+        except Exception as exc:
+            raise ValueError(f"Could not read that XLSX: {exc}") from exc
+        return "xlsx", text[:100_000]
+    if suffix in {".zip", ".jar", ".apk"} or mime_lower in {"application/zip", "application/x-zip-compressed"}:
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw), "r") as archive:
+                names = archive.namelist()[:1000]
+                text = "Archive contents:\n" + "\n".join(names)
+        except Exception as exc:
+            raise ValueError(f"Could not inspect that archive: {exc}") from exc
+        return "archive", text[:100_000]
+    if suffix == ".rtf" or mime_lower == "application/rtf":
+        decoded = raw.decode("utf-8", errors="replace")
+        decoded = re.sub(r"\\'[0-9a-fA-F]{2}", " ", decoded)
+        decoded = re.sub(r"\\[a-zA-Z]+-?\d* ?", " ", decoded)
+        decoded = decoded.replace("{", " ").replace("}", " ")
+        return "text", re.sub(r"[ \t]+", " ", decoded)[:100_000]
+    if suffix in TEXT_EXTENSIONS or mime_lower.startswith("text/"):
         return "text", raw.decode("utf-8", errors="replace")[:100_000]
-    raise ValueError("Supported files: DOCX, PDF, text, CSV, JSON, XML, common source-code files, and images.")
+    # Accept unknown binary formats so the user can still attach/store any file.
+    # Zeno receives trustworthy metadata for these files, but does not pretend it can read opaque binary bytes.
+    return "binary", ""
 
 
 def sanitize_filename(name: str) -> str:
@@ -8950,6 +9425,21 @@ class AppHandler(BaseHTTPRequestHandler):
             )
         else:
             local_action = direct_file_action(chat_id, content)
+            if local_action is None:
+                web_request = natural_deepsearch_request(content)
+                if web_request is not None:
+                    contextual_goal = deepsearch_goal_with_chat_context(chat_id, str(web_request["goal"]))
+                    job_id = start_deepsearch(
+                        chat_id, str(web_request["url"]), contextual_goal,
+                        int(web_request["page_limit"]), int(web_request["max_depth"]),
+                    )
+                    mode = "all-pages pagination crawl" if bool(web_request.get("exhaustive")) else "site scan"
+                    local_action = (
+                        f"🌐 Zeno {mode} started · job `{job_id[:8]}` · "
+                        f"up to {int(web_request['page_limit']):,} pages. "
+                        "Progress and the final sourced report will appear in this chat.",
+                        [],
+                    )
         if local_action is not None:
             local_answer, generated_attachments = local_action
             sources: list[dict[str, Any]] = []
@@ -8960,7 +9450,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 chat_id, content, file_ids, skip_message_id=skip_id, history_before_id=history_before_id
             )
             model, _, chunks = stream_completion(
-                messages, stop_event, max_tokens=8000 if wants_downloadable_file(content) else 2600,
+                messages, stop_event, max_tokens=adaptive_output_token_limit(content, downloadable_file=wants_downloadable_file(content)),
                 user_message=content, timeout_seconds=LM_LONG_GENERATION_TIMEOUT_SECONDS,
                 request_class="chat",
             )

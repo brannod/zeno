@@ -27,7 +27,12 @@ from files import resume_pending_file_jobs, stop_file_jobs_for_chat
 from browser import set_browser_chat_append_hook, shutdown_live_browser
 from browser_agent import set_browser_agent_chat_append_hook, stop_browser_agents_for_chat
 from screen_reader import set_screen_reader_chat_append_hook, stop_screen_reader_jobs_for_chat
-from desktop_notetaker import stop_notetaker_for_chat, stop_notetaker_worker
+from desktop_notetaker import (
+    ensure_notetaker_worker,
+    notetaker_settings,
+    stop_notetaker_for_chat,
+    stop_notetaker_worker,
+)
 from deepsearch import (
     resume_pending_deepsearch_jobs,
     set_deepsearch_chat_append_hook,
@@ -40,6 +45,7 @@ from discord_bridge import (
     stop_discord_bridge,
 )
 from model_api import get_model_runtime
+from mcp_manager import start_mcp_manager
 from http_server import create_server, snapshot_state
 
 
@@ -63,6 +69,13 @@ def initialize() -> None:
     clear_settings_cache()
     preload_settings()
     wire_subsystems()
+    # Start Auto-Watch only from the persisted setting during application bootstrap.
+    # Merely polling /api/notetaker/status must never start or re-enable the watcher.
+    try:
+        if notetaker_settings().get("enabled"):
+            ensure_notetaker_worker()
+    except Exception as exc:
+        print(f"Notetaker auto-watch not started: {exc}")
     start_maintenance_worker()
     resume_pending_file_jobs()
     # V2.7 marked unfinished DeepSearch jobs interrupted during DB bootstrap.
@@ -78,6 +91,11 @@ def initialize() -> None:
     except Exception as exc:
         # Discord is optional and must never block local Zeno startup.
         print(f"Discord bridge not started: {exc}")
+    try:
+        start_mcp_manager()
+    except Exception as exc:
+        # MCP is optional. Missing SDK or an offline local server must not block Zeno startup.
+        print(f"MCP manager not started: {exc}")
 
 
 def shutdown() -> None:

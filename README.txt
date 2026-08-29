@@ -1,13 +1,13 @@
-ZENO 3.5.0
+ZENO 3.6.0
 ==========
 
 Zeno is a private local assistant with a modular Python backend, LM Studio model
 support, memory, files, Live Browser, Browser Agent, Screen Reader, DeepSearch,
-and a chat-only Discord bridge.
+a shared Discord bridge, and an MCP client hub for local tools such as AYCD.
 
 QUICK START
 1. Install Python 3.11+.
-2. Run INSTALL_ZENO.bat once if you want Playwright/PDF/Discord integrations.
+2. Run INSTALL_ZENO.bat once to install Playwright/PDF/Discord/MCP integrations.
 3. Start LM Studio's local server at http://127.0.0.1:1234.
 4. Keep your configured 4B model available for Fast/Balanced. Deep uses the
    configured 30B model only when Deep is explicitly selected.
@@ -24,8 +24,20 @@ IMPORTANT FOLDERS
 - zeno_data/uploads/     uploaded source files
 - zeno_data/outputs/     generated files
 - zeno_data/browser_profile/ persistent Live Browser profile
-- zeno_data/private/     private Discord configuration
+- zeno_data/private/     private Discord + MCP credentials/configuration
 - zeno_data/updates/     downloaded releases and updater backups
+
+
+MCP / AYCD
+----------
+Zeno 3.6 is an MCP client. AYCD remains the MCP server. In Settings -> MCP
+Servers, enter the Streamable HTTP endpoint shown by AYCD (for example a local
+http://127.0.0.1:PORT/mcp URL) and its Bearer API key. The key is stored only
+under zeno_data/private/mcp_servers.json and is never returned to the browser UI.
+
+Normal browser-chat and Discord messages share the same MCP routing path. A
+message that mentions AYCD can use discovered read-only AYCD tools automatically.
+Tools that may change AYCD data require a separate approve/cancel reply.
 
 MODEL ROUTING
 - Fast: configured fast model

@@ -1,8 +1,9 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title Zeno 3.6.1
-py -3 zeno.py
+title Zeno 3.6.2
+set PYTHONUNBUFFERED=1
+py -3 -u zeno.py
 if errorlevel 1 (
   echo.
   echo Zeno exited with an error. Review the message above.

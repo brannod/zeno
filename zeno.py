@@ -14,6 +14,7 @@ import time
 import webbrowser
 
 from config import APP_HOST, APP_PORT, APP_VERSION
+from console_runtime import configure_console_runtime, console_log
 from database import init_db
 from settings import clear_settings_cache, preload_settings
 from context import set_context_stop_hook
@@ -75,7 +76,7 @@ def initialize() -> None:
         if notetaker_settings().get("enabled"):
             ensure_notetaker_worker()
     except Exception as exc:
-        print(f"Notetaker auto-watch not started: {exc}")
+        console_log(f"Notetaker auto-watch not started: {exc}")
     start_maintenance_worker()
     resume_pending_file_jobs()
     # V2.7 marked unfinished DeepSearch jobs interrupted during DB bootstrap.
@@ -83,43 +84,43 @@ def initialize() -> None:
     try:
         resume_pending_deepsearch_jobs()
     except Exception as exc:
-        print(f"DeepSearch recovery skipped: {exc}")
+        console_log(f"DeepSearch recovery skipped: {exc}")
     try:
         config = discord_bridge_config()
         if bool(config.get("enabled")):
             start_discord_bridge()
     except Exception as exc:
         # Discord is optional and must never block local Zeno startup.
-        print(f"Discord bridge not started: {exc}")
+        console_log(f"Discord bridge not started: {exc}")
     try:
         start_mcp_manager()
     except Exception as exc:
         # MCP is optional. Missing SDK or an offline local server must not block Zeno startup.
-        print(f"MCP manager not started: {exc}")
+        console_log(f"MCP manager not started: {exc}")
 
 
 def shutdown() -> None:
     try:
         stop_discord_bridge()
     except Exception as exc:
-        print(f"Discord shutdown warning: {exc}")
+        console_log(f"Discord shutdown warning: {exc}")
     try:
         stop_maintenance_worker()
     except Exception as exc:
-        print(f"Maintenance shutdown warning: {exc}")
+        console_log(f"Maintenance shutdown warning: {exc}")
     try:
         stop_notetaker_worker()
     except Exception as exc:
-        print(f"Notetaker shutdown warning: {exc}")
+        console_log(f"Notetaker shutdown warning: {exc}")
     try:
         shutdown_live_browser()
     except Exception as exc:
-        print(f"Browser shutdown warning: {exc}")
+        console_log(f"Browser shutdown warning: {exc}")
     try:
         # Do not unload a model that the user loaded outside Zeno.
         get_model_runtime().close(unload_owned=False)
     except Exception as exc:
-        print(f"Model runtime shutdown warning: {exc}")
+        console_log(f"Model runtime shutdown warning: {exc}")
 
 
 def check_installation() -> int:
@@ -136,6 +137,7 @@ def check_installation() -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    console_runtime = configure_console_runtime()
     parser = argparse.ArgumentParser(description=f"Zeno {APP_VERSION} local assistant")
     parser.add_argument("--host", default=APP_HOST)
     parser.add_argument("--port", type=int, default=APP_PORT)
@@ -173,6 +175,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f" {url}")
     print(" Fast/Balanced use the configured fast model; Deep is opt-in.")
     print(" Press Ctrl+C to stop.")
+    if console_runtime.get("windows"):
+        print(" Windows console guard: QuickEdit disabled · request logs asynchronous")
     print("=" * 62)
 
     if not args.no_browser:

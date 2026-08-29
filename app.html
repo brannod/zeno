@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Zeno 3.6.1</title>
+<title>Zeno 3.6.2</title>
 <link rel="icon" href="/zeno-icon.png">
 <style>
 :root{--bg:#07090d;--side:#0d1017;--panel:#11151e;--panel2:#171c27;--line:#293141;--text:#f2f4fa;--muted:#929bad;--red:#e13d50;--red2:#ff6676;--red3:#6d202b;--green:#55d6a9;--amber:#efbd63;--blue:#6aa9ff;--shadow:#0008}
@@ -112,7 +112,7 @@ html,body,button,input,textarea,select{font-family:var(--ui-font);font-stretch:s
 <body>
 <div id="appRoot" class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="logo"><img src="/zeno-icon.png" alt="Zeno"></div><div><h1>Zeno</h1><small id="version">3.6.1 · LOCAL</small></div></div>
+    <div class="brand"><div class="logo"><img src="/zeno-icon.png" alt="Zeno"></div><div><h1>Zeno</h1><small id="version">3.6.2 · LOCAL</small></div></div>
     <div class="sidebar-controls"><button class="btn full" onclick="newChat()">＋ New chat</button><input id="chatSearch" class="search" placeholder="Search chats" oninput="renderChats()"></div>
     <div id="chatList" class="chat-list"></div>
     <div class="sidebar-foot"><div id="sideStatus">Starting Zeno…</div><div style="margin-top:5px">Your data stays in the local <span class="kbd">memory/</span> and <span class="kbd">zeno_data/</span> folders.</div></div>
@@ -187,7 +187,7 @@ html,body,button,input,textarea,select{font-family:var(--ui-font);font-stretch:s
       </section>
 
       <section id="tool-memory" class="tool-panel">
-        <div class="section"><h3>🧠 Memory Manager 3.6.1</h3><div id="memoryStats" class="stat-grid"></div><div class="row"><input id="memorySearch" placeholder="Filter memories" oninput="renderMemory()"><select id="memoryTemp" onchange="renderMemory()"><option value="all">All temperatures</option><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option><option value="pinned">Pinned</option></select></div><textarea id="memoryNew" placeholder="Add a durable memory…" style="margin-top:7px"></textarea><button class="btn full" style="margin-top:6px" onclick="addMemory()">Add memory</button><div class="row"><button class="btn ghost" onclick="saveContext()">Summarize chat → memory</button><a id="memoryExport" class="btn ghost" style="text-align:center;text-decoration:none" download>Export ZIP</a></div><div class="row"><button class="btn ghost" onclick="analyzeMemory()">Find duplicates</button><button class="btn danger" onclick="optimizeMemory()">Merge strong duplicates</button></div><div id="memoryAnalysis" class="note" style="margin-top:7px">Optimizer is conservative and never rewrites memory text with a model.</div></div>
+        <div class="section"><h3>🧠 Memory Manager 3.6.2</h3><div id="memoryStats" class="stat-grid"></div><div class="row"><input id="memorySearch" placeholder="Filter memories" oninput="renderMemory()"><select id="memoryTemp" onchange="renderMemory()"><option value="all">All temperatures</option><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option><option value="pinned">Pinned</option></select></div><textarea id="memoryNew" placeholder="Add a durable memory…" style="margin-top:7px"></textarea><button class="btn full" style="margin-top:6px" onclick="addMemory()">Add memory</button><div class="row"><button class="btn ghost" onclick="saveContext()">Summarize chat → memory</button><a id="memoryExport" class="btn ghost" style="text-align:center;text-decoration:none" download>Export ZIP</a></div><div class="row"><button class="btn ghost" onclick="analyzeMemory()">Find duplicates</button><button class="btn danger" onclick="optimizeMemory()">Merge strong duplicates</button></div><div id="memoryAnalysis" class="note" style="margin-top:7px">Optimizer is conservative and never rewrites memory text with a model.</div></div>
         <div id="memoryList" class="memory-list"></div>
       </section>
 
@@ -234,7 +234,7 @@ function renderAll(){if(!S)return;$('version').textContent=S.app.version+' · LO
 function renderChats(){if(!S)return;const q=$('chatSearch').value.trim().toLowerCase();$('chatList').innerHTML=S.chats.filter(c=>!c.archived&&(!q||String(c.title).toLowerCase().includes(q))).map(c=>'<div class="chat-item '+(Number(c.id)===Number(S.chat.id)?'active':'')+'" onclick="switchChat('+Number(c.id)+')"><div class="chat-title">'+esc(c.title)+'</div><div class="chat-time">'+esc(fmtDate(c.updated_at))+'</div></div>').join('')||'<div class="note">No chats found.</div>'}
 function historyLoaderHtml(){const h=S?.message_history||{};if(!h.has_older)return'';return'<div class="history-loader"><button onclick="loadOlderMessages()">↑ Load older messages</button><span>Showing '+Number(h.loaded||0).toLocaleString()+' of '+Number(h.total||0).toLocaleString()+'</span></div>'}
 async function loadOlderMessages(){if(!S?.message_history?.has_older)return;historyLimit=Math.min(3000,Math.max(historyLimit+300,Number(S.message_history.loaded||0)+300));await loadState(true,S.chat.id,true)}
-function renderMessages(){if(!S)return;const el=$('messages');const wasNear=nearBottom();if(!S.messages.length&&!busy){el.innerHTML='<div class="empty"><h2>Zeno <b>3.6.1</b></h2><div>Your chat history stays attached to the selected conversation.</div></div>';return}el.innerHTML=historyLoaderHtml()+S.messages.map(messageHtml).join('')+(busy?streamHtml():'');if(wasNear)maybeBottom(true)}
+function renderMessages(){if(!S)return;const el=$('messages');const wasNear=nearBottom();if(!S.messages.length&&!busy){el.innerHTML='<div class="empty"><h2>Zeno <b>3.6.2</b></h2><div>Your chat history stays attached to the selected conversation.</div></div>';return}el.innerHTML=historyLoaderHtml()+S.messages.map(messageHtml).join('')+(busy?streamHtml():'');if(wasNear)maybeBottom(true)}
 function messageHtml(m){const attachments=(m.attachments||[]).map(a=>{if(typeof a==='number'||typeof a==='string')return'';const url=a.url||('/api/generated-file?id='+a.id);return'<a class="download" href="'+esc(url)+'" download>⬇ '+esc(a.name||'Download')+(a.size_bytes?' · '+esc(fmtBytes(a.size_bytes)):'')+'</a>'}).join('');const sources=(m.citations||[]).slice(0,12).map(s=>'<a class="source" target="_blank" rel="noreferrer" href="'+esc(s.url||'#')+'">['+esc(s.label||'S')+'] '+esc(s.title||'Source')+'</a>').join('');let origin='';if(m.source==='discord'&&m.source_label)origin=' · '+esc(m.source_label);else if(m.source==='aycd')origin=' · AYCD';return'<div class="msg '+esc(m.role)+'"><div class="avatar">'+(m.role==='assistant'?'<img src="/zeno-icon.png" alt="Zeno">':'Y')+'</div><div class="bubble"><div class="who">'+(m.role==='assistant'?'Zeno':'You')+origin+'</div><div class="content">'+markdown(m.content||'')+'</div>'+(attachments?'<div class="attachments">'+attachments+'</div>':'')+(sources?'<div class="sources">'+sources+'</div>':'')+'</div></div>'}
 function streamHtml(){return'<div id="streamMsg" class="msg assistant"><div class="avatar"><img src="/zeno-icon.png" alt="Zeno"></div><div class="bubble"><div class="who">Zeno</div><div id="streamContent" class="content">'+(streamText?markdown(streamText):'<p>Starting…</p>')+'</div><div class="stream-progress"><div class="bar"><i id="streamBar" style="width:'+streamProgress+'%"></i></div><div id="streamLabel" class="stream-label">'+streamProgress+'%</div></div></div></div>'}
 function renderStream(){let msg=$('streamMsg');if(!msg){$('messages').insertAdjacentHTML('beforeend',streamHtml());msg=$('streamMsg')}const stick=nearBottom();$('streamContent').innerHTML=streamText?markdown(streamText):'<p>Working…</p>';$('streamBar').style.width=streamProgress+'%';$('streamLabel').textContent=(window.streamDetail||'Working')+' · '+streamProgress+'%';renderGlobalActivity();if(stick)maybeBottom(true)}
@@ -261,7 +261,50 @@ async function universalStop(){
     toast(labels.length?'Stopped: '+labels.join(', ')+'.':'Stop signal sent. No active task reported.',true);globalActivityState={active:false,tasks:[],count:0};renderGlobalActivity();setTimeout(pollGlobalActivity,250);
   }catch(e){toast(e.message);globalActivityState={active:false};renderGlobalActivity()}
 }
-async function sendMessage(){const content=$('prompt').value.trim();if(!content||busy)return;const optimisticId='local-'+(crypto.randomUUID?crypto.randomUUID():String(Date.now()));const optimisticAttachments=[...pendingFiles].map(id=>{const f=(S?.files||[]).find(x=>Number(x.id)===Number(id));return f?{id:f.id,name:f.name,size_bytes:f.size_bytes||0,url:'/api/file?id='+f.id+'&download=1'}:null}).filter(Boolean);$('prompt').value='';streamText='';streamProgress=1;window.streamDetail='Starting';currentRequestId=crypto.randomUUID?crypto.randomUUID():String(Date.now());S.messages=[...(S.messages||[]),{id:optimisticId,role:'user',content,created_at:Date.now()/1000,attachments:optimisticAttachments,citations:[],source:'web_chat',source_label:'',optimistic:true}];setBusy(true);renderMessages();maybeBottom(true);try{const r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:S.chat.id,content,request_id:currentRequestId,file_ids:[...pendingFiles]})});if(!r.ok){let d={};try{d=await r.json()}catch{}throw new Error(d.error||'Chat request failed')}const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='';while(true){const {value,done}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('\n');buffer=lines.pop();for(const line of lines){if(!line.trim())continue;const ev=JSON.parse(line);if(ev.type==='delta'){streamText+=ev.text||'';renderStream()}else if(ev.type==='progress'){streamProgress=Math.max(streamProgress,Number(ev.percent)||0);window.streamDetail=ev.detail||ev.phase||'Working';renderStream()}else if(ev.type==='error')throw new Error(ev.error||'Generation failed');else if(ev.type==='stopped'){toast('Generation stopped.')}}}pendingFiles.clear();await loadState(false)}catch(e){toast(e.message);S.messages=(S.messages||[]).filter(m=>m.id!==optimisticId);try{await loadState(false)}catch{}if(!$('prompt').value.trim())$('prompt').value=content}finally{setBusy(false);currentRequestId='';streamText='';streamProgress=0}}
+const CHAT_CONNECT_TIMEOUT_MS=30000,CHAT_STREAM_IDLE_MS=180000;
+function readChatChunk(reader,controller){return new Promise((resolve,reject)=>{let settled=false;const timer=setTimeout(()=>{if(settled)return;settled=true;try{controller.abort()}catch{}reject(new Error('Chat stream was silent for 3 minutes. Zeno stopped the stalled request so the browser can recover.'))},CHAT_STREAM_IDLE_MS);reader.read().then(v=>{if(settled)return;settled=true;clearTimeout(timer);resolve(v)},e=>{if(settled)return;settled=true;clearTimeout(timer);reject(e)})})}
+async function sendMessage(){
+  const content=$('prompt').value.trim();if(!content||busy)return;
+  const optimisticId='local-'+(crypto.randomUUID?crypto.randomUUID():String(Date.now()));
+  const optimisticAttachments=[...pendingFiles].map(id=>{const f=(S?.files||[]).find(x=>Number(x.id)===Number(id));return f?{id:f.id,name:f.name,size_bytes:f.size_bytes||0,url:'/api/file?id='+f.id+'&download=1'}:null}).filter(Boolean);
+  $('prompt').value='';streamText='';streamProgress=1;window.streamDetail='Starting';
+  currentRequestId=crypto.randomUUID?crypto.randomUUID():String(Date.now());const requestId=currentRequestId;
+  S.messages=[...(S.messages||[]),{id:optimisticId,role:'user',content,created_at:Date.now()/1000,attachments:optimisticAttachments,citations:[],source:'web_chat',source_label:'',optimistic:true}];
+  setBusy(true);renderMessages();maybeBottom(true);
+  const controller=new AbortController();let connectTimedOut=false;
+  const connectTimer=setTimeout(()=>{connectTimedOut=true;try{controller.abort()}catch{}},CHAT_CONNECT_TIMEOUT_MS);
+  try{
+    let r;
+    try{r=await fetch('/api/chat/stream',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({chat_id:S.chat.id,content,request_id:requestId,file_ids:[...pendingFiles]})})}
+    catch(e){if(connectTimedOut)throw new Error('Zeno did not open the chat stream within 30 seconds. The local server may be stalled.');throw e}
+    clearTimeout(connectTimer);
+    if(!r.ok){let d={};try{d=await r.json()}catch{}throw new Error(d.error||'Chat request failed')}
+    if(!r.body)throw new Error('Chat stream did not provide a response body.');
+    const reader=r.body.getReader(),decoder=new TextDecoder();let buffer='';
+    while(true){
+      const {value,done}=await readChatChunk(reader,controller);if(done)break;
+      buffer+=decoder.decode(value,{stream:true});const lines=buffer.split('\n');buffer=lines.pop();
+      for(const line of lines){
+        if(!line.trim())continue;const ev=JSON.parse(line);
+        if(ev.type==='delta'){streamText+=ev.text||'';renderStream()}
+        else if(ev.type==='progress'){streamProgress=Math.max(streamProgress,Number(ev.percent)||0);window.streamDetail=ev.detail||ev.phase||'Working';renderStream()}
+        else if(ev.type==='error')throw new Error(ev.error||'Generation failed');
+        else if(ev.type==='stopped'){toast('Generation stopped.')}
+      }
+    }
+    pendingFiles.clear();await loadState(false);
+  }catch(e){
+    clearTimeout(connectTimer);
+    if(controller.signal.aborted&&requestId){try{await api('/api/stop',{chat_id:S.chat.id,request_id:requestId})}catch{}}
+    toast(e?.name==='AbortError'?'Chat stream was interrupted and recovered.':(e.message||String(e)));
+    S.messages=(S.messages||[]).filter(m=>m.id!==optimisticId);
+    try{await loadState(false)}catch{}
+    const alreadyStored=(S?.messages||[]).some(m=>m.role==='user'&&!m.optimistic&&String(m.content||'')===content);
+    if(!alreadyStored&&!$('prompt').value.trim())$('prompt').value=content;
+  }finally{
+    clearTimeout(connectTimer);setBusy(false);currentRequestId='';streamText='';streamProgress=0;
+  }
+}
 async function newChat(){try{historyLimit=300;const r=await api('/api/chat/new',{});S=r.state;localStorage.setItem('zeno.activeChatId',String(S.chat.id));renderAll();maybeBottom(true)}catch(e){toast(e.message)}}
 async function switchChat(id){if(busy)return toast('Stop the current reply before switching chats.');try{historyLimit=300;const r=await api('/api/chat/switch',{chat_id:id});S=r.state;localStorage.setItem('zeno.activeChatId',String(S.chat.id));pendingFiles.clear();await loadState(false,id);maybeBottom(true)}catch(e){toast(e.message)}}
 async function setMode(mode){try{await api('/api/settings',{settings:{model_mode:mode}});S.settings.model_mode=mode;renderModes();toast('Model mode: '+mode.toUpperCase(),true)}catch(e){toast(e.message)}}

@@ -1,0 +1,6 @@
+{
+  "version": "3.4.2",
+  "title": "Zeno v3.4.2 Desktop Notetaker",
+  "asset": "Zeno_v3.4.2_Desktop_Notetaker_Pack.zip",
+  "body": "## Zeno v3.4.2 Desktop Notetaker\n\nAdds the new Desktop Notetaker section for continuous AI screen observation and note-taking while staying connected to Zeno's main chat.\n\n### Highlights\n- Desktop Notetaker section\n- Configurable AI watch interval\n- Custom watch/focus instructions\n- Main-chat observation posting\n- Unchanged-screen suppression before LM Studio analysis\n- Multi-monitor selection\n- Manual Analyze Now control\n- Rolling observation history\n- Passive observation only; Browser Agent remains responsible for actions\n- Windows-first packaging with macOS/Linux-compatible mss capture layer\n\nThis is an upgrade pack for the newer modular Zeno line and does not replace the older monolithic 2.7.x source tree.\n\nSHA-256: c8943ccd1672b4c0dfa94db1d56ce78253ae093970e38d2a579c14b1347c3687"
+}

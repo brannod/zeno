@@ -1,0 +1,86 @@
+name: Publish complete Zeno v3.4.2 build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'release-assets/v3.4.2/full_parts/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  publish-and-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Reconstruct complete ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          PART_DIR='release-assets/v3.4.2/full_parts'
+          test -f "$PART_DIR/READY"
+          cat "$PART_DIR"/part-* > /tmp/zeno-v342.b64
+          base64 -d /tmp/zeno-v342.b64 > /tmp/Zeno_v3.4.2_COMPLETE_BUILD.zip
+          unzip -t /tmp/Zeno_v3.4.2_COMPLETE_BUILD.zip
+          echo '23997afa6056f9c652562d85cd07e5424946ca523c96f200e56a824c80e4e149  /tmp/Zeno_v3.4.2_COMPLETE_BUILD.zip' | sha256sum -c -
+
+      - name: Replace v3.4.2 release asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release delete-asset v3.4.2 Zeno_v3.4.2_Desktop_Notetaker_Pack.zip -y || true
+          gh release upload v3.4.2 /tmp/Zeno_v3.4.2_COMPLETE_BUILD.zip --clobber
+          gh release edit v3.4.2 \
+            --title 'Zeno v3.4.2 Complete Build' \
+            --notes 'Complete updater-compatible modular Zeno v3.4.2 build. Includes Browser Agent, /screen, persistent reminders, Memory Optimizer, Task Router, deterministic multi-file search, Live Browser upgrades, and Desktop Notetaker. Private Discord tokens, memory/database files, browser profiles, uploads, outputs, and runtime data are excluded.' \
+            --latest
+
+      - name: Sync complete modular source to main
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/zeno-v342-extract
+          mkdir -p /tmp/zeno-v342-extract
+          unzip -q /tmp/Zeno_v3.4.2_COMPLETE_BUILD.zip -d /tmp/zeno-v342-extract
+          SRC="$(dirname "$(find /tmp/zeno-v342-extract -type f -name zeno.py -print -quit)")"
+          test -n "$SRC"
+          test -f "$SRC/app.html"
+          test -f "$SRC/config.py"
+          test -f "$SRC/http_server.py"
+          test -f "$SRC/desktop_notetaker.py"
+
+          cp "$SRC"/*.py ./
+          for FILE in app.html VERSION requirements.txt START_ZENO.bat INSTALL_ZENO.bat README.txt FIRST_TIME_USER_GUIDE.txt DISCORD_GUIDE.txt ZENO_3.0_INTEGRATION_AUDIT.txt DISCORD_TOKEN.example.txt zeno-icon.png zeno-wallpaper.svg zeno.ico; do
+            if [ -f "$SRC/$FILE" ]; then cp "$SRC/$FILE" ./; fi
+          done
+
+          rm -f DISCORD_TOKEN.txt .env zeno.db
+          rm -rf memory zeno_data user_data browser_profile uploads outputs downloads screenshots logs __pycache__
+          rm -rf release-assets/v3.4.2/full_parts
+
+          python -m compileall -q .
+          python zeno.py --check
+          grep -q '^v3.4.2$' VERSION
+          grep -q '^APP_VERSION = "3.4.2"' config.py
+          grep -q 'ZENO_DESKTOP_NOTETAKER_2026_08_28' app.html
+
+      - name: Commit full v3.4.2 source
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          if git diff --cached --quiet; then
+            echo 'Nothing to commit.'
+            exit 0
+          fi
+          git commit -m 'Sync complete Zeno v3.4.2 modular source [skip release]'
+          git push origin main

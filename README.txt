@@ -1,4 +1,4 @@
-ZENO 3.4.2
+ZENO 3.4.3
 ==========
 
 Zeno is a private local assistant with a modular Python backend, LM Studio model
@@ -64,7 +64,7 @@ Run: py -3 zeno.py --check
 This validates startup/module integration without keeping the web server open.
 
 
-ZENO 3.4.2 CURRENT FEATURES
+ZENO 3.4.3 CURRENT FEATURES
 - Recent Live Browser workspace/UI upgrades and deterministic multi-file search.
 - Discord slash commands plus Browser Agent remote controls and /screen.
 - Persistent reminders, conservative Memory Optimizer, and Task Router.
@@ -82,3 +82,42 @@ ZENO 3.2 HIGHLIGHTS
 - Restored Discord !compact command. It saves durable context into memory and
   starts a fresh context window without deleting visible chat history.
 - GitHub release workflows include all modular files, including performance.py.
+
+
+ZENO 3.4.3 NOTETAKER + LM STUDIO MODEL GUIDE
+============================================
+
+DESKTOP NOTETAKER
+------------------
+Open Tools -> NOTETAKER. The Notetaker is a passive desktop observer. It captures the selected monitor in memory, sends a bounded screenshot to the selected local vision model, and can append meaningful observations into the same main Zeno chat. It does not click, type, or control the desktop.
+
+Recommended defaults:
+- Vision model: huihui-qwen3-vl-4b-instruct-abliterated
+- Watch interval: 20 seconds
+- Skip unchanged screenshots: ON
+- Add meaningful notes to main chat: ON
+
+Analyze Now should move through Capturing -> Preparing -> Analyzing -> Complete. If it shows Error, the Notetaker panel now displays the actual backend error instead of only showing a generic status. Common causes are: LM Studio Local Server is off, no model is loaded, the selected model is not present, or the selected model does not support image input.
+
+The Notetaker uses only a compact slice of recent main-chat text for relevance. It no longer injects the full chat/memory/browser context into every screen check, which reduces context-overflow failures and speeds up vision analysis.
+
+LM STUDIO MODEL DROPDOWNS
+--------------------------
+Open Tools -> SETTINGS -> Models and click "Detect LM Studio models". Zeno reads the models currently visible to the LM Studio Local Server and fills the Fast / Balanced and Deep dropdowns. The default Fast / Balanced model remains huihui-qwen3-vl-4b-instruct-abliterated.
+
+The Notetaker has its own Vision model dropdown. This lets you keep Zeno's normal chat model unchanged while choosing a different vision-capable model for desktop analysis. A model chosen for Notetaker must support image input.
+
+After changing the normal Fast/Deep model, save settings and use Apply / reload model if needed. Changing only the Notetaker vision model does not require changing Zeno's normal chat model.
+
+ZENO 3.4.3 NOTETAKER + MODEL SELECTION
+---------------------------------------
+- Files is the first Tools section. Notetaker is a dedicated Tools section.
+- Notetaker captures the selected desktop monitor in memory and sends the screenshot to the selected vision model.
+- Zeno prefers LM Studio's native POST /api/v1/chat multimodal endpoint and falls back to /v1/chat/completions when needed.
+- In Settings -> Models, click Detect LM Studio models to refresh the dropdowns from LM Studio.
+- The default Fast/Balanced and Notetaker model remains huihui-qwen3-vl-4b-instruct-abliterated.
+- You can select another detected LM Studio model. For Notetaker, choose a vision-capable/VL model; Zeno labels likely vision models when identifiable.
+- Notetaker has its own model selection, AI watch interval, monitor, watch instructions, skip-unchanged control, and same-main-chat posting.
+- Analyze Now shows the exact current phase, selected model/transport, and any LM Studio error instead of silently staying on Analyzing.
+- Memory retrieval is relevance-gated. Turning memory retrieval off now injects no long-term memories, and pinned memories no longer bypass topical relevance.
+

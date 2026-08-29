@@ -1,0 +1,97 @@
+s=document.getElementById('notetakerChecks');if(checks)checks.textContent=Number(s.checks_total||0).toLocaleString();const skipped=document.getElementById('notetakerSkipped');if(skipped)skipped.textContent=Number(s.skipped_unchanged||0).toLocaleString();const lastResult=document.getElementById('notetakerLastResult');if(lastResult)lastResult.textContent=String(s.last_check_result||'No checks yet.').slice(0,42);updateNtCountdown();
+-    const activity=s.activity||[],activityEl=document.getElementById('notetakerActivity');if(activityEl)activityEl.innerHTML=activity.length?activity.slice(-8).reverse().map(x=>'<div class="notetaker-activity-row '+ntEsc(x.kind||'')+'"><time>'+new Date(Number(x.at||0)*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})+'</time>'+ntEsc(x.detail||x.kind||'event')+'</div>').join(''):'<div class="note">No activity yet.</div>';
++    const watchHint=document.getElementById('notetakerWatchHint');if(watchHint&&!notetakerToggleBusy)watchHint.textContent=cfg.enabled?'Watching continuously. Turn this off once and it stays off.':'Paused. Analyze Once still works without enabling Auto-Watch.';const activity=s.activity||[],activityEl=document.getElementById('notetakerActivity');if(activityEl)activityEl.innerHTML=activity.length?activity.slice(-5).reverse().map(x=>'<div class="notetaker-activity-row '+ntEsc(x.kind||'')+'"><time>'+new Date(Number(x.at||0)*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})+'</time>'+ntEsc(x.detail||x.kind||'event')+'</div>').join(''):'<div class="note">No activity yet.</div>';
+ 
+     const sessions=s.sessions||[],activeSession=sessions.find(x=>!Number(x.ended_at||0))||sessions[0]||null;
+     const sessTitle=document.getElementById('notetakerSessionTitle'),sessMeta=document.getElementById('notetakerSessionMeta'),sessSummary=document.getElementById('notetakerSessionSummary'),sessCounts=document.getElementById('notetakerSessionCounts');
+     if(activeSession){if(sessTitle)sessTitle.textContent=activeSession.title||'Desktop session';if(sessMeta)sessMeta.textContent='Started '+new Date(Number(activeSession.started_at||0)*1000).toLocaleString()+(activeSession.ended_at?' · ended':' · active');if(sessSummary)sessSummary.textContent=activeSession.summary||'Session understanding will grow as Zeno observes meaningful changes.';if(sessCounts)sessCounts.textContent=Number(activeSession.event_count||0)+' events · '+Number(activeSession.important_count||0)+' important';}else{if(sessTitle)sessTitle.textContent='Current screen session';if(sessMeta)sessMeta.textContent='Waiting for the first observation…';if(sessSummary)sessSummary.textContent='Zeno will connect screen events here as the session develops.';if(sessCounts)sessCounts.textContent='0 events';}
+     const sessionsEl=document.getElementById('notetakerSessions');if(sessionsEl)sessionsEl.innerHTML=sessions.length?sessions.map(x=>'<div class="nt-session-row"><b>'+ntEsc(x.title||'Desktop session')+'</b><small>'+new Date(Number(x.started_at||0)*1000).toLocaleString()+' · '+Number(x.event_count||0)+' events · '+Number(x.important_count||0)+' important'+(x.ended_at?' · ended':' · active')+'</small><div>'+ntEsc(x.summary||'No session summary yet.')+'</div></div>').join(''):'<div class="note">No sessions yet.</div>';
+ 
+-    const timeline=s.timeline||s.history||[],timelineEl=document.getElementById('notetakerTimeline'),timelineCount=document.getElementById('notetakerTimelineCount');if(timelineCount)timelineCount.textContent=timeline.length+' events';
++    const timeline=s.timeline||s.history||[];renderNotetakerTimelineLocal(timeline);
+     function structuredOf(x){return x?.structured&&typeof x.structured==='object'?x.structured:{};}
+-    function timelineText(x){const q=structuredOf(x);return q.changed||q.visible||x.content||x.detail||'';}
+-    if(timelineEl)timelineEl.innerHTML=timeline.length?'<div class="nt-timeline">'+timeline.slice().reverse().map(x=>{const q=structuredOf(x),imp=String(x.importance||q.importance||'medium').toLowerCase(),etype=String(x.event_type||q.event_type||x.kind||'observation'),title=String(x.title||q.title||etype);const important=(q.important||[]).slice(0,2);return '<div class="nt-event '+ntEsc(imp)+'"><div class="nt-event-time">'+new Date(Number(x.created_at||0)*1000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'</div><div class="nt-event-dot"></div><div class="nt-event-body"><div class="nt-event-title">'+ntEsc(title)+'<span class="nt-event-type">'+ntEsc(etype)+'</span>'+(imp==='high'||imp==='critical'?'<span class="pill">'+ntEsc(imp)+'</span>':'')+'</div><div class="nt-event-text">'+ntEsc(timelineText(x)).slice(0,900)+'</div>'+(important.length?'<div class="nt-event-important">'+important.map(v=>'• '+ntEsc(v)).join('<br>')+'</div>':'')+'</div></div>'}).join('')+'</div>':'<div class="note">No timeline events yet.</div>';
+ 
+     const history=s.history||[],historyEl=document.getElementById('notetakerHistory');const notes=history.filter(x=>String(x.kind||'observation')==='observation'),latestRow=notes.at(-1)||null,latestStructured=structuredOf(latestRow),latest=document.getElementById('notetakerLatest'),latestBadge=document.getElementById('notetakerLatestBadge');
+     if(latest){if(latestRow&&Object.keys(latestStructured).length){const important=Array.isArray(latestStructured.important)?latestStructured.important:[];latest.innerHTML=(latestStructured.visible?'<div class="nt-structured-section"><b>What Zeno sees</b><div>'+ntEsc(latestStructured.visible)+'</div></div>':'')+(latestStructured.changed?'<div class="nt-structured-section"><b>What changed / progress</b><div>'+ntEsc(latestStructured.changed)+'</div></div>':'')+(important.length?'<div class="nt-structured-section"><b>Important details</b><div>'+important.map(v=>'• '+ntEsc(v)).join('<br>')+'</div></div>':'')+(latestStructured.next_watch?'<div class="nt-structured-section"><b>Watch next</b><div>'+ntEsc(latestStructured.next_watch)+'</div></div>':'');}else latest.textContent=String(s.last_observation||latestRow?.content||'No observation yet.');}
+@@ -482,15 +507,16 @@
+     if(historyEl)historyEl.innerHTML=history.length?history.slice().reverse().map(x=>'<div class="notetaker-note"><b>'+ntEsc(x.title||String(x.kind||'observation').toUpperCase())+'</b> <span class="pill">'+ntEsc(x.event_type||'observation')+'</span><br>'+ntEsc(x.content||x.detail||'')+'<small>'+new Date(Number(x.created_at||0)*1000).toLocaleString()+(x.model?' · '+ntEsc(x.model):'')+(x.duration_ms?' · '+(Number(x.duration_ms)/1000).toFixed(1)+'s':'')+'</small></div>').join(''):'<div class="note">No saved notes yet.</div>';
+   }catch(e){const el=document.getElementById('notetakerError');if(el)el.textContent=e.message}
+ };
+-window.saveNotetakerSettings=async function(){
++window.saveNotetakerSettings=async function(options={}){
+   try{
+-    const payload={enabled:document.getElementById('notetakerEnabled').checked,interval_seconds:Number(document.getElementById('notetakerInterval').value),focus:document.getElementById('notetakerFocus').value,monitor:Number(document.getElementById('notetakerMonitor').value||0),post_to_chat:document.getElementById('notetakerPostChat').checked,skip_unchanged:document.getElementById('notetakerSkip').checked,model:document.getElementById('notetakerModel')?.value||'',detail_level:document.getElementById('notetakerDetailLevel')?.value||'detailed'};
++    const payload={interval_seconds:Number(document.getElementById('notetakerInterval').value),focus:document.getElementById('notetakerFocus').value,monitor:Number(document.getElementById('notetakerMonitor').value||0),post_to_chat:document.getElementById('notetakerPostChat').checked,skip_unchanged:document.getElementById('notetakerSkip').checked,model:document.getElementById('notetakerModel')?.value||'',detail_level:document.getElementById('notetakerDetailLevel')?.value||'detailed'};if(options.includeEnabled)payload.enabled=document.getElementById('notetakerEnabled').checked;
+     const r=await fetch('/api/notetaker/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not save Notetaker settings');
+-    if(typeof toast==='function')toast(payload.enabled?'Notetaker is watching the desktop.':'Notetaker paused.',true);refreshNotetaker(true);
++    notetakerFormDirty=false;const save=document.getElementById('notetakerSaveState');if(save){save.className='note nt-save-ok';save.textContent='Settings saved.';}if(typeof toast==='function')toast('Notetaker settings saved.',true);refreshNotetaker(true);
+   }catch(e){const el=document.getElementById('notetakerError');if(el)el.textContent=e.message}
+ };
++window.endNotetakerSession=async function(){try{const r=await fetch('/api/notetaker/session/end',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:S?.chat?.id||null})});const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not end screen session');notetakerState=data;await refreshNotetaker(false);if(typeof toast==='function')toast('Screen session ended. The next event starts a fresh session.',true);}catch(e){if(typeof toast==='function')toast(e.message)}};
+ window.analyzeNotetakerNow=async function(){
+-  try{await saveNotetakerSettings();const body={chat_id:S?.chat?.id||null};const r=await fetch('/api/notetaker/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Analyze-now failed');if(typeof toast==='function')toast('Notetaker started analyzing the current desktop…',true);for(let i=0;i<240;i++){await new Promise(res=>setTimeout(res,500));await refreshNotetaker(false);if(notetakerState&&!notetakerState.analyzing&&notetakerState.phase!=='queued'){if(notetakerState.error){if(typeof toast==='function')toast('Notetaker error: '+notetakerState.error)}else if(typeof toast==='function')toast('Notetaker analysis finished.',true);break;}}}catch(e){const el=document.getElementById('notetakerError');if(el)el.textContent=e.message;if(typeof toast==='function')toast(e.message)}
++  try{await saveNotetakerSettings({includeEnabled:false});const body={chat_id:S?.chat?.id||null};const r=await fetch('/api/notetaker/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const data=await r.json();if(!r.ok)throw new Error(data.error||'Analyze-now failed');if(typeof toast==='function')toast('Notetaker started analyzing the current desktop…',true);for(let i=0;i<240;i++){await new Promise(res=>setTimeout(res,500));await refreshNotetaker(false);if(notetakerState&&!notetakerState.analyzing&&notetakerState.phase!=='queued'){if(notetakerState.error){if(typeof toast==='function')toast('Notetaker error: '+notetakerState.error)}else if(typeof toast==='function')toast('Notetaker analysis finished.',true);break;}}}catch(e){const el=document.getElementById('notetakerError');if(el)el.textContent=e.message;if(typeof toast==='function')toast(e.message)}
+ };
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',initNotetaker,{once:true});else initNotetaker();
+ })();
+--- a/database.py
++++ b/database.py
+@@ -521,17 +521,6 @@
+                 event_count INTEGER NOT NULL DEFAULT 0,
+                 important_count INTEGER NOT NULL DEFAULT 0
+             );
+-            CREATE INDEX IF NOT EXISTS idx_screen_reader_history_chat ON screen_reader_history(chat_id, completed_at DESC);
+-            CREATE INDEX IF NOT EXISTS idx_notetaker_notes_chat ON notetaker_notes(chat_id, created_at DESC, id DESC);
+-            CREATE INDEX IF NOT EXISTS idx_notetaker_notes_session ON notetaker_notes(session_id, created_at DESC, id DESC);
+-            CREATE INDEX IF NOT EXISTS idx_notetaker_sessions_chat ON notetaker_sessions(chat_id, updated_at DESC, id DESC);
+-            CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id, id);
+-            CREATE INDEX IF NOT EXISTS idx_pages_chat_active_id ON pages(chat_id, active, id);
+-            CREATE INDEX IF NOT EXISTS idx_files_chat_active_id ON files(chat_id, active, id);
+-            CREATE INDEX IF NOT EXISTS idx_generated_files_chat_deleted ON generated_files(chat_id, deleted_at, created_at);
+-            CREATE INDEX IF NOT EXISTS idx_file_jobs_chat_status ON file_jobs(chat_id, status, updated_at);
+-            CREATE INDEX IF NOT EXISTS idx_browser_assist_chat_id ON browser_assist_messages(chat_id, id);
+-            CREATE INDEX IF NOT EXISTS idx_memories_updated ON memories(updated_at DESC);
+             """
+         )
+         # Upgrade compatible earlier databases in place.
+@@ -579,6 +568,27 @@
+             "structured_json": "TEXT NOT NULL DEFAULT '{}'",
+         }.items():
+             ensure_column(db, "notetaker_notes", name, declaration)
++
++        # Create indexes only after legacy schemas have been upgraded.
++        # Older Zeno databases can already contain these tables without newer
++        # columns such as notetaker_notes.session_id or messages.chat_id.
++        # Creating migration-sensitive indexes before ensure_column() would
++        # abort startup before the migration could run.
++        db.executescript(
++            """
++            CREATE INDEX IF NOT EXISTS idx_screen_reader_history_chat ON screen_reader_history(chat_id, completed_at DESC);
++            CREATE INDEX IF NOT EXISTS idx_notetaker_notes_chat ON notetaker_notes(chat_id, created_at DESC, id DESC);
++            CREATE INDEX IF NOT EXISTS idx_notetaker_notes_session ON notetaker_notes(session_id, created_at DESC, id DESC);
++            CREATE INDEX IF NOT EXISTS idx_notetaker_sessions_chat ON notetaker_sessions(chat_id, updated_at DESC, id DESC);
++            CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id, id);
++            CREATE INDEX IF NOT EXISTS idx_pages_chat_active_id ON pages(chat_id, active, id);
++            CREATE INDEX IF NOT EXISTS idx_files_chat_active_id ON files(chat_id, active, id);
++            CREATE INDEX IF NOT EXISTS idx_generated_files_chat_deleted ON generated_files(chat_id, deleted_at, created_at);
++            CREATE INDEX IF NOT EXISTS idx_file_jobs_chat_status ON file_jobs(chat_id, status, updated_at);
++            CREATE INDEX IF NOT EXISTS idx_browser_assist_chat_id ON browser_assist_messages(chat_id, id);
++            CREATE INDEX IF NOT EXISTS idx_memories_updated ON memories(updated_at DESC);
++            """
++        )
+         for prior_data_dir in migrated_data_dirs:
+             old_prefix = prior_data_dir.name.replace("\\", "/") + "/"
+             old_windows_prefix = prior_data_dir.name + "\\"
+--- a/config.py
++++ b/config.py
+@@ -31,7 +31,7 @@
+ LEGACY_MEMORY_IMPORT_PATH = BASE_DIR / "ZENO_LEGACY_MEMORY_IMPORT.md"
+ 
+ APP_NAME = "Zeno"
+-APP_VERSION = "3.5.0"
++APP_VERSION = "3.5.1"
+ DEFAULT_UPDATE_REPO = "brannod/zeno"
+ SELFDEV_CORE_FILES = (
+     "zeno.py", "app.html", "requ

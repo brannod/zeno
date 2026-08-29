@@ -1,0 +1,22 @@
+irements.txt", "START_ZENO.bat", "INSTALL_ZENO.bat",
+--- a/http_server.py
++++ b/http_server.py
+@@ -864,7 +864,7 @@
+             # ZENO_DESKTOP_NOTETAKER_2026_08_28
+             if route == "/api/notetaker/status":
+                 from desktop_notetaker import notetaker_status
+-                self.send_json(notetaker_status())
++                self.send_json(notetaker_status(start_if_enabled=False))
+                 return
+             self.send_json({"error": "Route not found", "route": route}, 404)
+         except FileNotFoundError as exc:
+@@ -916,6 +916,9 @@
+         if route == "/api/notetaker/analyze":
+             from desktop_notetaker import request_notetaker_analysis
+             return request_notetaker_analysis(payload.get("chat_id"))
++        if route == "/api/notetaker/session/end":
++            from desktop_notetaker import end_notetaker_session
++            return end_notetaker_session(payload.get("chat_id"))
+ 
+         # Chat lifecycle -------------------------------------------------
+         if route == "/api/chat/new":

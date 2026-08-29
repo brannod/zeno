@@ -1,0 +1,140 @@
+--- a/zeno.py
++++ b/zeno.py
+@@ -27,7 +27,12 @@
+ from browser import set_browser_chat_append_hook, shutdown_live_browser
+ from browser_agent import set_browser_agent_chat_append_hook, stop_browser_agents_for_chat
+ from screen_reader import set_screen_reader_chat_append_hook, stop_screen_reader_jobs_for_chat
+-from desktop_notetaker import stop_notetaker_for_chat, stop_notetaker_worker
++from desktop_notetaker import (
++    ensure_notetaker_worker,
++    notetaker_settings,
++    stop_notetaker_for_chat,
++    stop_notetaker_worker,
++)
+ from deepsearch import (
+     resume_pending_deepsearch_jobs,
+     set_deepsearch_chat_append_hook,
+@@ -63,6 +68,13 @@
+     clear_settings_cache()
+     preload_settings()
+     wire_subsystems()
++    # Start Auto-Watch only from the persisted setting during application bootstrap.
++    # Merely polling /api/notetaker/status must never start or re-enable the watcher.
++    try:
++        if notetaker_settings().get("enabled"):
++            ensure_notetaker_worker()
++    except Exception as exc:
++        print(f"Notetaker auto-watch not started: {exc}")
+     start_maintenance_worker()
+     resume_pending_file_jobs()
+     # V2.7 marked unfinished DeepSearch jobs interrupted during DB bootstrap.
+--- a/desktop_notetaker.py
++++ b/desktop_notetaker.py
+@@ -1018,6 +1018,12 @@
+                 _finish_notetaker_session(current_chat_id())
+             except Exception:
+                 pass
++            # OFF means truly off: stop the background watcher thread instead of
++            # leaving an idle loop alive waiting for a future settings poll.
++            try:
++                stop_notetaker_worker()
++            except RuntimeError:
++                pass
+         else:
+             _ANALYSIS_CANCEL_EVENT.clear()
+     if interval_seconds is not None:
+@@ -1058,6 +1064,23 @@
+     return notetaker_status(start_if_enabled=False)
+ 
+ 
++
++def end_notetaker_session(chat_id: int | None = None) -> dict[str, Any]:
++    """End the current screen-understanding session without changing Auto-Watch."""
++    actual_chat = current_chat_id(chat_id)
++    _finish_notetaker_session(actual_chat)
++    _state_update(
++        session_id=0,
++        session_title="",
++        session_summary="",
++        session_started_at=0,
++        session_event_count=0,
++        important_event_count=0,
++        detail="Screen session ended. The next meaningful observation starts a new session.",
++    )
++    _activity("session", "Screen session ended manually")
++    return notetaker_status(start_if_enabled=False) | {"ended": True}
++
+ def request_notetaker_analysis(chat_id: int | None = None) -> dict[str, Any]:
+     if _ANALYSIS_LOCK.locked():
+         return notetaker_status(start_if_enabled=False) | {"queued": False, "detail": "Notetaker is already analyzing."}
+@@ -1127,6 +1150,7 @@
+     "notetaker_sessions",
+     "analyze_desktop_once",
+     "ensure_notetaker_worker",
++    "end_notetaker_session",
+     "stop_notetaker_worker",
+     "stop_notetaker_for_chat",
+     "update_notetaker_settings",
+--- a/VERSION
++++ b/VERSION
+@@ -1 +1 @@
+-v3.5.0
++v3.5.1
+--- a/app.html
++++ b/app.html
+@@ -3,7 +3,7 @@
+ <head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+-<title>Zeno 3.5.0</title>
++<title>Zeno 3.5.1</title>
+ <link rel="icon" href="/zeno-icon.png">
+ <style>
+ :root{--bg:#07090d;--side:#0d1017;--panel:#11151e;--panel2:#171c27;--line:#293141;--text:#f2f4fa;--muted:#929bad;--red:#e13d50;--red2:#ff6676;--red3:#6d202b;--green:#55d6a9;--amber:#efbd63;--blue:#6aa9ff;--shadow:#0008}
+@@ -59,6 +59,12 @@
+ .history-loader{display:flex;justify-content:center;align-items:center;gap:8px;margin:0 auto 16px;padding:6px 9px;width:max-content;max-width:100%;border:1px solid #293142;border-radius:99px;background:#0a0d13;color:#8f9aae;font-family:var(--ui-font);font-size:8px}.history-loader button{border:0;background:transparent;color:#ff9aaa;font-weight:850;padding:0;cursor:pointer}.history-loader button:hover{text-decoration:underline}
+ .global-taskbar{position:fixed;left:10px;right:10px;bottom:8px;z-index:120;height:34px;display:grid;grid-template-columns:auto minmax(120px,1fr) auto;align-items:center;gap:9px;padding:5px 7px 5px 10px;border:1px solid rgba(129,47,61,.78);border-radius:11px;background:rgba(8,9,13,.94);backdrop-filter:blur(16px);box-shadow:0 12px 34px #0009,0 0 22px #d9364e18;transform:translateY(58px);opacity:0;pointer-events:none;transition:transform .18s ease,opacity .18s ease}.global-taskbar.show{transform:translateY(0);opacity:1;pointer-events:auto}.global-task-copy{min-width:0;display:flex;align-items:center;gap:7px}.global-task-dot{width:7px;height:7px;border-radius:50%;background:#ff5870;box-shadow:0 0 10px #ff5870aa;animation:zenoPulse 1.15s ease-in-out infinite}.global-task-text{min-width:0}.global-task-title{font-size:9px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.global-task-detail{font-size:7.5px;color:#8f99aa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:54vw}.global-task-progress{height:5px;border-radius:99px;background:#171b24;overflow:hidden;min-width:120px}.global-task-progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,#a92b40,#ff4f69,#ff8a9b);transition:width .25s ease}.global-task-progress.indeterminate i{width:38%;animation:zenoRail 1.15s ease-in-out infinite}.global-task-stop{border:1px solid #7d3040;background:#421923;color:#ffd7dc;border-radius:7px;padding:5px 8px;font-size:8px;font-weight:900}.global-task-count{font-size:7px;color:#7f8999;margin-left:3px}@keyframes zenoRail{0%{transform:translateX(-120%)}100%{transform:translateX(300%)}}@keyframes zenoPulse{50%{opacity:.45;transform:scale(.78)}}
+ @media(max-width:1200px){.app{grid-template-columns:218px minmax(410px,1fr) 330px}.global-task-detail{max-width:42vw}}
++
++/* ZENO_3_5_1_NOTETAKER_CONTROLS */
++.composer{grid-template-columns:auto minmax(0,1fr) auto auto}
++.composer-stop-all{height:43px;min-width:59px;border:1px solid #7b2a3a;border-radius:10px;background:linear-gradient(180deg,#4b1721,#2c1016);color:#ffc8d0;font-size:8px;font-weight:950;letter-spacing:.035em;padding:0 8px}.composer-stop-all:hover{background:linear-gradient(180deg,#6b1d2b,#3a111a);border-color:#b23a4f}
++.notetaker-control-strip{display:flex;align-items:center;justify-content:space-between;gap:7px;padding:7px 9px;margin:7px 0;border:1px solid #30394c;border-radius:9px;background:#090d14}.nt-watch-switch{margin:0;min-width:0}.nt-watch-switch span{display:flex;flex-direction:column;min-width:0}.nt-watch-switch b{font-size:9px}.nt-watch-switch small{font-size:7px;color:var(--muted);margin-top:1px;line-height:1.3}.notetaker-activity-compact{max-height:66px}.notetaker-activity-compact .notetaker-activity-row:nth-child(n+6){display:none}.notetaker-action-row{display:grid;grid-template-columns:1fr 1fr 1fr}.nt-timeline-tools{display:grid;grid-template-columns:minmax(0,1fr) 125px;gap:5px;margin:7px 0}.nt-timeline-tools input,.nt-timeline-tools select{padding:6px 7px;font-size:8px}.nt-save-ok{color:#71ddb5}.nt-save-busy{color:#f2c46d}.nt-save-error{color:#ff8297}
++@media(max-width:1100px){.composer-stop-all{min-width:48px;padding:0 6px}.nt-timeline-tools{grid-template-columns:1fr}.notetaker-action-row{grid-template-columns:1fr 1fr}.notetaker-action-row>*:last-child{grid-column:1/-1}}
+ </style>
+ 
+ <style id="zenoRecentUpgradeStyle">
+@@ -94,7 +100,7 @@
+ <body>
+ <div id="appRoot" class="app">
+   <aside class="sidebar">
+-    <div class="brand"><div class="logo"><img src="/zeno-icon.png" alt="Zeno"></div><div><h1>Zeno</h1><small id="version">3.5.0 · LOCAL</small></div></div>
++    <div class="brand"><div class="logo"><img src="/zeno-icon.png" alt="Zeno"></div><div><h1>Zeno</h1><small id="version">3.5.1 · LOCAL</small></div></div>
+     <div class="sidebar-controls"><button class="btn full" onclick="newChat()">＋ New chat</button><input id="chatSearch" class="search" placeholder="Search chats" oninput="renderChats()"></div>
+     <div id="chatList" class="chat-list"></div>
+     <div class="sidebar-foot"><div id="sideStatus">Starting Zeno…</div><div style="margin-top:5px">Your data stays in the local <span class="kbd">memory/</span> and <span class="kbd">zeno_data/</span> folders.</div></div>
+@@ -109,7 +115,7 @@
+     <div id="messages" class="messages"></div>
+     <div class="composer-wrap">
+       <div id="pending" class="pending"></div>
+-      <div class="composer"><button class="attach" title="Attach files" onclick="document.getElementById('quickFile').click()">＋</button><textarea id="prompt" placeholder="Message Zeno…" onkeydown="promptKey(event)"></textarea><button id="send" class="send" onclick="sendOrStop()">➜</button></div>
++      <div class="composer"><button class="attach" title="Attach files" onclick="document.getElementById('quickFile').click()">＋</button><textarea id="prompt" placeholder="Message Zeno…" onkeydown="promptKey(event)"></textarea><button id="composerStopAll" class="composer-stop-all" title="Stop reply, Notetaker, Browser Agent, DeepSearch, Screen Reader and active file work" onclick="universalStop()">■ STOP</button><button id="send" class="send" onclick="sendOrStop()">➜</button></div>
+       <input id="quickFile" type="file" multiple hidden onchange="quickUpload(this.files)">
+       <div class="hint">Enter to send · Shift+Enter for a new line · Scroll stays where you put it while Zeno streams</div>
+     </div>
+@@ -143,14 +149,14 @@
+ 
+         <div class="nt-session"><div class="nt-session-head"><b id="notetakerSessionTitle">Current screen session</b><span id="notetakerSessionCounts" class="pill">0 events</span></div><div id="notetakerSessionMeta" class="nt-session-meta">Waiting for the first observation…</div><div id="notetakerSessionSummary" class="nt-session-summary">Zeno will connect screen events here as the session develops.</div></div>
+ 
+-        <label class="switch"><input id="notetakerEnabled" type="checkbox"> Watch my desktop</label>
+-        <div class="notetaker-card"><div class="notetaker-range-head"><b>AI watch interval</b><span id="notetakerIntervalLabel">20 sec</span></div><input id="notetakerInterval" class="notetaker-range" type="range" min="3" max="300" step="1" value="20"><label class="label" style="margin-top:7px">Note detail</label><select id="notetakerDetailLevel"><option value="brief">Brief</option><option value="standard">Standard</option><option value="detailed" selected>Detailed</option></select></div>
++        <div class="notetaker-control-strip"><label class="switch nt-watch-switch"><input id="notetakerEnabled" type="checkbox"><span><b>Auto-Watch desktop</b><small id="notetakerWatchHint">Off stays off until you explicitly turn it back on.</small></span></label><button class="btn danger tiny" onclick="universalStop()" title="Pause Notetaker and stop all current Zeno work">■ Stop all</button></div>
++        <div class="notetaker-card"><div class="notetaker-range-head"><b>AI watch interval</b><span id="notetakerIntervalLabel">20 sec</span></div><input id="notetakerInterval" class="notetaker-range" type="range" min="3" max="300" step="1" value="20"><label class="label" style="margin-top:7px">Note detail</label><select id="notetakerDetailLevel"><option value="brief">Brief</option><option value="standard">Standard</option><option value="detailed" selected>Detailed</option></select><div class="note" style="margin-top:7px">Analyze Once works independently from Auto-Watch. It will not turn continuous watching on.</div></div>
+         <div class="notetaker-card"><h4>What should Zeno watch for?</h4><textarea id="notetakerFocus" rows="6" placeholder="Example: Watch this app for errors, progress, completed tasks, changed numbers, and decisions I should remember."></textarea><div class="note">This objective is included with every screen check and also guides event importance.</div></div>
+         <div class="notetaker-card"><h4>Vision model + screen</h4><label class="label">Notetaker vision model</label><select id="notetakerModel"></select><button class="btn ghost full" style="margin-top:6px" onclick="refreshLmModels(true)">↻ Detect LM Studio models</button><div class="note" id="notetakerModelHelp">Default: <b>huihui-qwen3-vl-4b-instruct-abliterated</b>. Notetaker requires image/vision support.</div><label class="label" style="margin-top:8px">Monitor</label><select id="notetakerMonitor"></select><label class="switch"><input id="notetakerPostChat" type="checkbox" checked> Add meaningful notes to main chat</label><label class="switch"><input id="notetakerSkip" type="checkbox" checked> Skip unchanged screenshots</label></div>
+-        <div class="notetaker-action-row"><button class="btn" onclick="saveNotetakerSettings()">Save + Apply</button><button class="btn ghost" onclick="analyzeNotetakerNow()">Analyze Now</button></div><div id="notetakerError" class="note" style="margin-top:8px"></div>
++        <div class="notetaker-action-row"><button class="btn" onclick="saveNotetakerSettings()">Save settings</button><button class="btn ghost" onclick="analyzeNotetakerNow()">Analyze Once</button><button class="btn ghost" onclick="endNotetakerSession()">End session</button></div><div id="notetakerSaveState" class="note" style="margin-top:6px">Auto-Watch changes save immediately.</div><div id="notetakerError" class="note" style="margin-top:5px"></div>
+ 
+         <div class="notetaker-card"><div class="notetaker-range-head"><h4 style="margin:0">Latest structured note</h4><span id="notetakerLatestBadge" class="pill">waiting</span></div><div id="notetakerLatest" class="nt-structured"><div class="note">No observation yet.</div></div></div>
+-        <div class="notetaker-card"><div class="notetaker-range-head"><h4 style="margin:0">Live screen timeline</h4><span id="notetakerTimelineCount">0 events</span></div><div class="note">Persistent event timeline. High/critical moments are highlighted; unchanged checks stay in the compact live activity strip instead of bloating the journal.</div><div id="notetakerTimeline" class="nt-timeline-scroll"><div class="note">No timeline events yet.</div></div></div>
++        <div class="notetaker-card"><div class="notetaker-range-head"><h4 style="margin:0">Live screen timeline</h4><span id="notetakerTimelineCount">0 events</span></div><div class="note">Persistent event timeline. High/critical moments are highlighted; unchanged checks stay in the compact live activity strip instead of bloating the journal.</div><div class="nt-timeline-tools"><input id="notetakerTimelineSearch" placeholder="Filter timeline…" oninput="renderNotetakerTimelineLocal()"><select id="notetakerTimelineFilter" onchange="renderNotetakerTimelineLocal()"><option value="all">All events</option><option value="important">Important only</option><option value="error">Errors / warnings</option><option value="progress">Progress</option><option value="completed">Completed</option></select></div><div id="notetakerTimeline" class="nt-timeline-scroll"><div class="note">No timeline eve

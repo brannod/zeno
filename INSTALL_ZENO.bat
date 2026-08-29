@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title Install Zeno 3.4.3
+title Install Zeno 3.4.4
 echo Installing optional Zeno integrations...
 py -3 -m pip install --upgrade pip
 if errorlevel 1 goto :fail
@@ -12,7 +12,7 @@ echo Installing Chromium for Live Browser...
 py -3 -m playwright install chromium
 if errorlevel 1 goto :fail
 echo.
-echo Zeno 3.4.3 dependencies are installed.
+echo Zeno 3.4.4 dependencies are installed.
 pause
 exit /b 0
 :fail

@@ -14,7 +14,7 @@ DISCORD_TOKEN.txt created by Zeno, then reload the Discord bridge in Settings.
 Never share that token file.
 
 
-ZENO 3.4.3 NOTETAKER + LM STUDIO MODEL GUIDE
+ZENO 3.4.4 NOTETAKER + LM STUDIO MODEL GUIDE
 ============================================
 
 DESKTOP NOTETAKER
@@ -39,7 +39,7 @@ The Notetaker has its own Vision model dropdown. This lets you keep Zeno's norma
 
 After changing the normal Fast/Deep model, save settings and use Apply / reload model if needed. Changing only the Notetaker vision model does not require changing Zeno's normal chat model.
 
-ZENO 3.4.3 NOTETAKER + MODEL SELECTION
+ZENO 3.4.4 NOTETAKER + MODEL SELECTION
 ---------------------------------------
 - Files is the first Tools section. Notetaker is a dedicated Tools section.
 - Notetaker captures the selected desktop monitor in memory and sends the screenshot to the selected vision model.
@@ -51,3 +51,14 @@ ZENO 3.4.3 NOTETAKER + MODEL SELECTION
 - Analyze Now shows the exact current phase, selected model/transport, and any LM Studio error instead of silently staying on Analyzing.
 - Memory retrieval is relevance-gated. Turning memory retrieval off now injects no long-term memories, and pinned memories no longer bypass topical relevance.
 
+
+ZENO 3.4.4 NOTE
+===============
+If Notetaker's native LM Studio vision request fails, Zeno automatically retries the OpenAI-compatible image endpoint. You do not need to change the normal chat model for this fallback.
+
+To choose models:
+1. Open Tools -> SETTINGS -> Models.
+2. Click Detect LM Studio models.
+3. Pick Fast/Balanced or Deep if desired, then Save settings.
+4. Open Tools -> NOTETAKER and choose the Notetaker Vision model separately.
+5. The default remains huihui-qwen3-vl-4b-instruct-abliterated.

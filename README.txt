@@ -1,4 +1,4 @@
-ZENO 3.4.3
+ZENO 3.4.4
 ==========
 
 Zeno is a private local assistant with a modular Python backend, LM Studio model
@@ -64,7 +64,7 @@ Run: py -3 zeno.py --check
 This validates startup/module integration without keeping the web server open.
 
 
-ZENO 3.4.3 CURRENT FEATURES
+ZENO 3.4.4 CURRENT FEATURES
 - Recent Live Browser workspace/UI upgrades and deterministic multi-file search.
 - Discord slash commands plus Browser Agent remote controls and /screen.
 - Persistent reminders, conservative Memory Optimizer, and Task Router.
@@ -84,7 +84,7 @@ ZENO 3.2 HIGHLIGHTS
 - GitHub release workflows include all modular files, including performance.py.
 
 
-ZENO 3.4.3 NOTETAKER + LM STUDIO MODEL GUIDE
+ZENO 3.4.4 NOTETAKER + LM STUDIO MODEL GUIDE
 ============================================
 
 DESKTOP NOTETAKER
@@ -109,7 +109,7 @@ The Notetaker has its own Vision model dropdown. This lets you keep Zeno's norma
 
 After changing the normal Fast/Deep model, save settings and use Apply / reload model if needed. Changing only the Notetaker vision model does not require changing Zeno's normal chat model.
 
-ZENO 3.4.3 NOTETAKER + MODEL SELECTION
+ZENO 3.4.4 NOTETAKER + MODEL SELECTION
 ---------------------------------------
 - Files is the first Tools section. Notetaker is a dedicated Tools section.
 - Notetaker captures the selected desktop monitor in memory and sends the screenshot to the selected vision model.
@@ -121,3 +121,16 @@ ZENO 3.4.3 NOTETAKER + MODEL SELECTION
 - Analyze Now shows the exact current phase, selected model/transport, and any LM Studio error instead of silently staying on Analyzing.
 - Memory retrieval is relevance-gated. Turning memory retrieval off now injects no long-term memories, and pinned memories no longer bypass topical relevance.
 
+
+ZENO 3.4.4 NOTETAKER + CONTEXT HARDENING
+========================================
+- Notetaker now uses a dedicated LM Studio vision path instead of the shared chat/runtime request stack.
+- It tries LM Studio native /api/v1/chat first and automatically falls back to /v1/chat/completions for recoverable native failures, including server-side 5xx errors.
+- Model detection for Notetaker uses /api/v1/models directly, with /v1/models as compatibility fallback.
+- Settings -> Models also falls back to the direct model inventory path if the runtime manager cannot enumerate models.
+- The default Fast/Balanced and Notetaker model remains huihui-qwen3-vl-4b-instruct-abliterated.
+- Notetaker prints a bounded traceback to the Zeno console when a screen analysis fails, while the GUI shows the concise error.
+- Tiny fresh messages such as "test", "hi", and "ping" no longer inject old rolling summaries, memories, pages, or assistant replies.
+- Pinned pages/files are preference hints only; they no longer bypass topical relevance.
+- Source chips are stored/displayed only when the final assistant answer explicitly cites the matching [S#] label.
+- The default personality no longer primes unrelated specialty topics into every reply.

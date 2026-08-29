@@ -33,53 +33,55 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Validate core source
+      - name: Validate modular source
         shell: bash
         run: |
           test -f zeno.py
           test -f app.html
-          python -m py_compile zeno.py
+          test -f config.py
+          test -f http_server.py
+          test -f database.py
+          test -f discord_bridge.py
+          test -f browser_agent.py
+          test -f updater.py
+          for FILE in ./*.py; do python -m py_compile "$FILE"; done
 
-      - name: Build clean updater ZIP
+      - name: Build clean complete updater ZIP
         id: package
         shell: bash
         env:
-          TAG: ${{ steps.version.outputs.tag }}
           VERSION_NUMBER: ${{ steps.version.outputs.version }}
         run: |
           rm -rf dist
           mkdir -p dist/Zeno
 
+          # Zeno is modular now: every root Python module is part of the app.
+          cp ./*.py dist/Zeno/
+
           FILES=(
-            zeno.py
             app.html
+            VERSION
             requirements.txt
             START_ZENO.bat
             INSTALL_ZENO.bat
             README.txt
             FIRST_TIME_USER_GUIDE.txt
             DISCORD_GUIDE.txt
-            ZENO_LEGACY_MEMORY_IMPORT.md
+            ZENO_3.0_INTEGRATION_AUDIT.txt
+            DISCORD_TOKEN.example.txt
           )
-
           for FILE in "${FILES[@]}"; do
             if [ -f "$FILE" ]; then cp "$FILE" dist/Zeno/; fi
           done
-          if [ -f zeno-icon.png ]; then cp zeno-icon.png dist/Zeno/; fi
 
-          if [ -f DISCORD_TOKEN.example.txt ]; then
-            cp DISCORD_TOKEN.example.txt dist/Zeno/DISCORD_TOKEN.txt
-          else
-            cat > dist/Zeno/DISCORD_TOKEN.txt <<'EOF'
-          ENABLED=false
-          TOKEN=DISCORD_BOT_TOKEN_HERE
-          SERVER_ID=DISCORD_SERVER_ID_HERE
-          CHANNEL_ID=DISCORD_CHANNEL_ID_HERE
-          CHAT_ID=CURRENT
-          EOF
-          fi
+          for FILE in zeno-icon.png zeno-wallpaper.svg zeno.ico; do
+            if [ -f "$FILE" ]; then cp "$FILE" dist/Zeno/; fi
+          done
 
-          ZIP="Zeno_V${VERSION_NUMBER}_GitHub_Release_Package.zip"
+          # Never put live/private runtime state into a public release.
+          rm -f dist/Zeno/DISCORD_TOKEN.txt
+
+          ZIP="Zeno_v${VERSION_NUMBER}_COMPLETE_BUILD.zip"
           (cd dist && zip -qr "$ZIP" Zeno)
           echo "zip=dist/$ZIP" >> "$GITHUB_OUTPUT"
           echo "name=$ZIP" >> "$GITHUB_OUTPUT"
@@ -92,16 +94,16 @@ jobs:
           ZIP: ${{ steps.package.outputs.zip }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; replacing updater ZIP."
+            echo "Release $TAG already exists; uploading complete build."
             gh release upload "$TAG" "$ZIP" --clobber
-            gh release edit "$TAG" --latest
+            gh release edit "$TAG" --title "Zeno $TAG Complete Build" --latest
           else
             if ! git rev-parse "$TAG" >/dev/null 2>&1; then
               git tag "$TAG"
               git push origin "$TAG"
             fi
             gh release create "$TAG" "$ZIP" \
-              --title "Zeno $TAG" \
+              --title "Zeno $TAG Complete Build" \
               --generate-notes \
               --latest
           fi
@@ -112,7 +114,8 @@ jobs:
           TAG: ${{ steps.version.outputs.tag }}
           PACKAGE: ${{ steps.package.outputs.name }}
         run: |
-          echo "### Zeno release built" >> "$GITHUB_STEP_SUMMARY"
+          echo "### Zeno complete release built" >> "$GITHUB_STEP_SUMMARY"
           echo "- Version: $TAG" >> "$GITHUB_STEP_SUMMARY"
           echo "- Asset: $PACKAGE" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Zeno's updater can now detect this as the latest release." >> "$GITHUB_STEP_SUMMARY"
+          echo "- Modular Python source included" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Private runtime data excluded" >> "$GITHUB_STEP_SUMMARY"

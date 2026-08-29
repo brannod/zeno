@@ -1,22 +1,13 @@
-ZENO DISCORD GUIDE
+ZENO 3.0 DISCORD GUIDE
 
-QUICK SETUP
-1. Go to the Discord Developer Portal and create a New Application.
-2. Open Bot, create/add the bot, and enable MESSAGE CONTENT INTENT under Privileged Gateway Intents.
-3. Open OAuth2 -> URL Generator. Select bot, then allow View Channels, Send Messages,
-   Read Message History, Add Reactions, Attach Files, and Embed Links.
-4. Invite the bot to your server. Turn on Discord Developer Mode if Copy Channel ID is hidden.
-5. Copy the bot token and the channel ID into DISCORD_TOKEN.txt beside Zeno.
-6. Save DISCORD_TOKEN.txt, then in Zeno Setup click Reload + link current chat.
+1. Create a Discord application/bot in the Discord Developer Portal.
+2. Enable Message Content Intent for the bot.
+3. Invite it with View Channels, Send Messages, Read Message History,
+   Add Reactions, Attach Files, and Embed Links.
+4. Start Zeno once so zeno_data/private/DISCORD_TOKEN.txt is created.
+5. Put your bot token and target channel ID in that private file.
+6. Restart Zeno or use Reload Discord in Settings.
 
-PRIVACY / TESTING NOTE
-If you are testing conversations you prefer separated from your main identity, use a separate
-test server/bot application or alternate account only where Discord's rules allow it. Never use
-an alternate account to evade moderation, restrictions, or bans.
-
-The token file is intentionally separate from this guide. Keep DISCORD_TOKEN.txt private.
-Use !help in Discord for the complete current command list.
-
-
-NATURAL WEBSITE SCANS
-Paste a public website URL in Discord and explicitly say scan, crawl, research, or go through the next/all pages. Zeno will start DeepSearch automatically and mirror progress/results back into the shared chat.
+Discord is a chat interface to the same Zeno conversation/memory. Browser tools
+remain controlled by the standalone GUI unless a specific Discord command is
+implemented for that operation.

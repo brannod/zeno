@@ -1,3 +1,6 @@
-playwright>=1.54,<2
-pypdf>=6,<7
-discord.py>=2.6,<3
+# Optional integrations used by Zeno 3.0. Core chat/server code is standard-library only.
+playwright>=1.49
+pypdf>=5.0
+discord.py>=2.4
+mss>=10.0.0
+Pillow>=10.0.0

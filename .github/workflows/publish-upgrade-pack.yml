@@ -1,0 +1,61 @@
+name: Publish Zeno upgrade pack
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'release-assets/**/release.json'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Locate release metadata
+        id: meta
+        shell: bash
+        run: |
+          META="$(find release-assets -name release.json -type f | sort | tail -n 1)"
+          test -n "$META"
+          DIR="$(dirname "$META")"
+          VERSION="$(jq -r '.version' "$META")"
+          TAG="v${VERSION}"
+          TITLE="$(jq -r '.title' "$META")"
+          ASSET="$(jq -r '.asset' "$META")"
+          BODY="$(jq -r '.body' "$META")"
+          test -f "$DIR/$ASSET"
+          printf '%s\n' "$BODY" > /tmp/release-body.md
+          echo "meta=$META" >> "$GITHUB_OUTPUT"
+          echo "dir=$DIR" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+          echo "asset=$DIR/$ASSET" >> "$GITHUB_OUTPUT"
+
+      - name: Create or refresh release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+          TITLE: ${{ steps.meta.outputs.title }}
+          ASSET: ${{ steps.meta.outputs.asset }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file /tmp/release-body.md --latest
+          else
+            gh release create "$TAG" "$ASSET" --target "$GITHUB_SHA" --title "$TITLE" --notes-file /tmp/release-body.md --latest
+          fi
+
+      - name: Summary
+        shell: bash
+        run: |
+          echo "### Zeno upgrade release published" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Tag: ${{ steps.meta.outputs.tag }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Asset: ${{ steps.meta.outputs.asset }}" >> "$GITHUB_STEP_SUMMARY"

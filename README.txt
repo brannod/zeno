@@ -1,4 +1,4 @@
-ZENO 3.4.4
+ZENO 3.5.0
 ==========
 
 Zeno is a private local assistant with a modular Python backend, LM Studio model
@@ -64,7 +64,7 @@ Run: py -3 zeno.py --check
 This validates startup/module integration without keeping the web server open.
 
 
-ZENO 3.4.4 CURRENT FEATURES
+ZENO 3.5.0 CURRENT FEATURES
 - Recent Live Browser workspace/UI upgrades and deterministic multi-file search.
 - Discord slash commands plus Browser Agent remote controls and /screen.
 - Persistent reminders, conservative Memory Optimizer, and Task Router.
@@ -134,3 +134,31 @@ ZENO 3.4.4 NOTETAKER + CONTEXT HARDENING
 - Pinned pages/files are preference hints only; they no longer bypass topical relevance.
 - Source chips are stored/displayed only when the final assistant answer explicitly cites the matching [S#] label.
 - The default personality no longer primes unrelated specialty topics into every reply.
+
+
+NOTETAKER JOURNAL (3.5.0)
+-------------------------
+Tools -> Notetaker now includes a live interval activity panel, Last Check / Next Check countdown, total-check and unchanged-skip counters, a live activity log, a persistent Notes Archive, and a Note Detail selector. Detailed is the default and produces substantially fuller screen-journal notes. Notetaker notes are saved independently of main-chat posting, while screenshots remain in memory and are not continuously stored.
+
+
+ZENO 3.5.0 WORKSTATION UI + CHAT HISTORY
+-----------------------------------------
+- The GUI uses a denser Bahnschrift-first workstation font stack and tighter spacing.
+- A universal bottom processing rail appears for replies, Notetaker analysis, Browser Agent, DeepSearch, File Worker, and Screen Reader work.
+- STOP on the rail uses Zeno's Universal Stop and pauses Notetaker too; it does not close the ordinary Live Browser session.
+- The last viewed chat is remembered locally and explicitly reopened after relaunch.
+- Current chats initially load the newest 300 messages. Use "Load older messages" at the top of the conversation to expand history in 300-message steps, up to 3,000 messages in one view.
+- Chat history remains stored in memory/zeno.db; upgrades do not replace that database.
+
+
+SCREEN READER RELIABILITY (3.5.0)
+---------------------------------
+- Screen Reader is a bounded one-time Live Browser scan. It is not the continuous watcher; use Desktop Notetaker for that.
+- Ordinary web-page scans have a 90-second scan safety limit.
+- Discord rendered-history scans have a 180-second normal safety limit.
+- An explicitly requested full/entire scan is capped at 8 minutes, then Zeno analyzes everything collected so far.
+- Visible-text fallback lines count toward the requested item target, so a Discord DOM-selector change cannot leave the reader chasing an unreachable structured-message count.
+- Dynamic Discord pages now stop when the virtual-list top/scroll position stabilizes, even if timestamps/loaders keep mutating.
+- Stop / Universal Stop is checked immediately after each browser step and discards the remaining scan before analysis.
+- Browser step waits are bounded to keep Stop responsive.
+- The GUI shows elapsed time and explicitly labels Screen Reader as a one-time scan.

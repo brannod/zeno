@@ -27,6 +27,7 @@ from files import resume_pending_file_jobs, stop_file_jobs_for_chat
 from browser import set_browser_chat_append_hook, shutdown_live_browser
 from browser_agent import set_browser_agent_chat_append_hook, stop_browser_agents_for_chat
 from screen_reader import set_screen_reader_chat_append_hook, stop_screen_reader_jobs_for_chat
+from desktop_notetaker import stop_notetaker_for_chat, stop_notetaker_worker
 from deepsearch import (
     resume_pending_deepsearch_jobs,
     set_deepsearch_chat_append_hook,
@@ -53,6 +54,7 @@ def wire_subsystems() -> None:
     register_chat_stop_hook("deepsearch", stop_deepsearch_for_chat, discord_visible=True)
     register_chat_stop_hook("browser_agent", stop_browser_agents_for_chat, discord_visible=True)
     register_chat_stop_hook("screen_reader", stop_screen_reader_jobs_for_chat, discord_visible=True)
+    register_chat_stop_hook("notetaker", stop_notetaker_for_chat, discord_visible=True)
     set_context_stop_hook(stop_all_chat_work)
 
 
@@ -87,6 +89,10 @@ def shutdown() -> None:
         stop_maintenance_worker()
     except Exception as exc:
         print(f"Maintenance shutdown warning: {exc}")
+    try:
+        stop_notetaker_worker()
+    except Exception as exc:
+        print(f"Notetaker shutdown warning: {exc}")
     try:
         shutdown_live_browser()
     except Exception as exc:

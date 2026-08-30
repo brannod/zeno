@@ -1,4 +1,4 @@
-ZENO 3.6.6
+ZENO 3.6.7
 ==========
 
 Zeno is a private local assistant with a modular Python backend, LM Studio model

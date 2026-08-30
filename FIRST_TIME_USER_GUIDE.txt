@@ -92,7 +92,7 @@ SCREEN READER RELIABILITY (3.5.0)
 - The GUI shows elapsed time and explicitly labels Screen Reader as a one-time scan.
 
 
-AYCD MASS PROFILE GENERATOR (3.6.6)
+AYCD MASS PROFILE GENERATOR (3.6.7)
 -----------------------------------
 When AYCD MCP is connected, use:
 

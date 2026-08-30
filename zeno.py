@@ -47,6 +47,7 @@ from discord_bridge import (
 )
 from model_api import get_model_runtime
 from mcp_manager import start_mcp_manager
+from aycd_commands import init_aycd_commands, stop_aycd_jobs_for_chat
 from http_server import create_server, snapshot_state
 
 
@@ -62,6 +63,7 @@ def wire_subsystems() -> None:
     register_chat_stop_hook("browser_agent", stop_browser_agents_for_chat, discord_visible=True)
     register_chat_stop_hook("screen_reader", stop_screen_reader_jobs_for_chat, discord_visible=True)
     register_chat_stop_hook("notetaker", stop_notetaker_for_chat, discord_visible=True)
+    register_chat_stop_hook("aycd_jobs", stop_aycd_jobs_for_chat, discord_visible=True)
     set_context_stop_hook(stop_all_chat_work)
 
 
@@ -92,6 +94,10 @@ def initialize() -> None:
     except Exception as exc:
         # Discord is optional and must never block local Zeno startup.
         console_log(f"Discord bridge not started: {exc}")
+    try:
+        init_aycd_commands()
+    except Exception as exc:
+        console_log(f"AYCD command layer not initialized: {exc}")
     try:
         start_mcp_manager()
     except Exception as exc:

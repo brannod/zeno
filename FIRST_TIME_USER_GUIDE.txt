@@ -90,3 +90,17 @@ SCREEN READER RELIABILITY (3.5.0)
 - Stop / Universal Stop is checked immediately after each browser step and discards the remaining scan before analysis.
 - Browser step waits are bounded to keep Stop responsive.
 - The GUI shows elapsed time and explicitly labels Screen Reader as a one-time scan.
+
+
+AYCD MASS PROFILE GENERATOR (3.6.6)
+-----------------------------------
+When AYCD MCP is connected, use:
+
+  !aycd generate 100
+
+Zeno prepares up to 100 synthetic/test profiles with randomized names,
+example.com emails, reserved test phone numbers and synthetic address fields.
+Payment/card fields are never generated. Review the preview, then approve with
+✅ or !aycd approve A001. If AYCD exposes a bulk profile tool, Zeno sends the
+batch in one call. If AYCD exposes only a single-profile create tool, Zeno
+processes the batch profile-by-profile and tracks progress in the AYCD job.

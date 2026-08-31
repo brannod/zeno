@@ -17,7 +17,7 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Locate release metadata
+      - name: Locate release metadata and rebuild asset
         id: meta
         shell: bash
         run: |
@@ -25,11 +25,28 @@ jobs:
           test -n "$META"
           DIR="$(dirname "$META")"
           VERSION="$(jq -r '.version' "$META")"
-          TAG="v${VERSION}"
+          TAG="$(jq -r '.tag // empty' "$META")"
+          if [ -z "$TAG" ]; then TAG="v${VERSION}"; fi
           TITLE="$(jq -r '.title' "$META")"
           ASSET="$(jq -r '.asset' "$META")"
           BODY="$(jq -r '.body' "$META")"
+          PARTS_DIR="$(jq -r '.parts_dir // empty' "$META")"
+          ENCODING="$(jq -r '.encoding // empty' "$META")"
+          SHA256="$(jq -r '.sha256 // empty' "$META")"
+
+          if [ -n "$PARTS_DIR" ]; then
+            if [ "$ENCODING" = "base64" ]; then
+              cat "$DIR/$PARTS_DIR"/part-*.b64 | base64 -d > "$DIR/$ASSET"
+            else
+              cat "$DIR/$PARTS_DIR"/part-* > "$DIR/$ASSET"
+            fi
+          fi
+
           test -f "$DIR/$ASSET"
+          if [ -n "$SHA256" ]; then
+            echo "$SHA256  $DIR/$ASSET" | sha256sum -c -
+          fi
+
           printf '%s\n' "$BODY" > /tmp/release-body.md
           echo "meta=$META" >> "$GITHUB_OUTPUT"
           echo "dir=$DIR" >> "$GITHUB_OUTPUT"

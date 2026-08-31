@@ -104,3 +104,8 @@ Payment/card fields are never generated. Review the preview, then approve with
 ✅ or !aycd approve A001. If AYCD exposes a bulk profile tool, Zeno sends the
 batch in one call. If AYCD exposes only a single-profile create tool, Zeno
 processes the batch profile-by-profile and tracks progress in the AYCD job.
+
+AYCD CARD FORMATTER (3.6.11)
+---------------------------
+Open Files -> File Tools -> AYCD Card Formatter for the browser-only local formatter.
+Discord can trigger the same local transform with !cardcolon or !cardcolon5 TYPE on an attached/replied text file. Discord receives only a summary; the formatted output stays under Files -> Generated outputs.

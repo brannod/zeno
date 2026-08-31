@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Zeno 3.6.9</title>
+<title>Zeno 3.6.11</title>
 <link rel="icon" href="/zeno-icon.png">
 <style>
 :root{--bg:#07090d;--side:#0d1017;--panel:#11151e;--panel2:#171c27;--line:#293141;--text:#f2f4fa;--muted:#929bad;--red:#e13d50;--red2:#ff6676;--red3:#6d202b;--green:#55d6a9;--amber:#efbd63;--blue:#6aa9ff;--shadow:#0008}
@@ -112,7 +112,7 @@ html,body,button,input,textarea,select{font-family:var(--ui-font);font-stretch:s
 <body>
 <div id="appRoot" class="app">
   <aside class="sidebar">
-    <div class="brand"><div class="logo"><img src="/zeno-icon.png" alt="Zeno"></div><div><h1>Zeno</h1><small id="version">3.6.9 · LOCAL</small></div></div>
+    <div class="brand"><div class="logo"><img src="/zeno-icon.png" alt="Zeno"></div><div><h1>Zeno</h1><small id="version">3.6.11 · LOCAL</small></div></div>
     <div class="sidebar-controls"><button class="btn full" onclick="newChat()">＋ New chat</button><input id="chatSearch" class="search" placeholder="Search chats" oninput="renderChats()"></div>
     <div id="chatList" class="chat-list"></div>
     <div class="sidebar-foot"><div id="sideStatus">Starting Zeno…</div><div style="margin-top:5px">Your data stays in the local <span class="kbd">memory/</span> and <span class="kbd">zeno_data/</span> folders.</div></div>
@@ -181,13 +181,16 @@ html,body,button,input,textarea,select{font-family:var(--ui-font);font-stretch:s
       <section id="tool-files" class="tool-panel active">
         <div class="section"><h3>📁 Files</h3><input id="fileInput" type="file" multiple><button class="btn full" style="margin-top:7px" onclick="uploadSelected()">Upload files</button><div class="note">Uploads become optional context for the current chat. Images can be attached to the next message.</div></div>
         <div class="section"><h3>⚙️ File Worker</h3><div class="note">Preview a saved transformation preset on one text file, then run it as a cancellable background job.</div><label class="label">Input file</label><select id="workerFile"></select><label class="label">Preset</label><select id="workerPreset"></select><label class="label">Extra instruction (optional)</label><textarea id="workerInstruction" placeholder="Additional rules for this run…"></textarea><div class="row"><button class="btn ghost" onclick="previewWorker()">Preview</button><button class="btn" onclick="startPreviewedWorker()">Run approved preview</button></div><div id="workerState"></div></div>
+        <div class="section" id="aycdCardFormatterSection"><h3>🧰 File Tools · AYCD Card Formatter · Local Only</h3><div class="note">Local formatter for AYCD Card Info. Values stay inside this browser tab. Discord can trigger the same local transform with <b>!cardcolon</b> or <b>!cardcolon5 TYPE</b>; Discord results are saved under Generated outputs instead of reposting the sensitive rows.</div><label class="label">Output format</label><select id="aycdCardFormatMode"><option value="4">number:month:year:cvv</option><option value="5">type:number:month:year:cvv</option></select><label class="label">Default card type (only used for 5-field output when a pasted row has no type)</label><input id="aycdCardDefaultType" autocomplete="off" placeholder="Leave blank if every row already includes type"><label class="label">Paste rows</label><textarea id="aycdCardInput" autocomplete="off" spellcheck="false" placeholder="Supports pipe tables, tab-separated rows, commas, spaces, or already-colonized rows.
+Example shape only: 4111... | 06 | 2028 | 123" style="min-height:150px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace"></textarea><div class="row"><button class="btn" onclick="formatAycdCardInfoLocal()">Format locally</button><button class="btn ghost" onclick="copyAycdCardInfoLocal()">Copy output</button><button class="btn danger" onclick="clearAycdCardInfoLocal()">Clear</button></div><div id="aycdCardFormatStatus" class="note" style="margin-top:7px">Nothing processed yet.</div><label class="label">AYCD-ready output</label><textarea id="aycdCardOutput" readonly autocomplete="off" spellcheck="false" placeholder="Formatted output appears here only in this browser tab." style="min-height:170px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace"></textarea></div>
+        <div class="section"><h3>🟠 AYCD inbound bridge</h3><div class="note">AYCD can POST into the same Zeno conversation used by Web Chat and, when the linked chat IDs match, Discord. This is the Zeno-side route; AYCD still needs to be configured to call it.</div><div id="aycdInfo" class="update-state" style="margin-top:7px">Checking AYCD route…</div><div class="row"><button class="btn ghost" onclick="refreshAycdRoute()">Check route</button><button class="btn ghost" onclick="copyAycdRoute()">Show request</button></div><div id="aycdRequest" class="job-log" style="display:none;max-height:180px;overflow:auto"></div></div>
         <div class="section danger-zone"><h3>🧹 Uploaded-file cleanup</h3><div class="note">Deletes uploaded/input files from Zeno's database and disk. Generated outputs are preserved. Active File Worker jobs must be stopped first.</div><button class="btn danger full" style="margin-top:7px" onclick="clearUploadedFiles()">Delete ALL uploaded files</button></div>
         <div class="section"><h3>Current chat uploads</h3><div id="fileList"></div></div>
         <div class="section"><h3>Generated outputs</h3><div id="generatedList"></div></div>
       </section>
 
       <section id="tool-memory" class="tool-panel">
-        <div class="section"><h3>🧠 Memory Manager 3.6.9</h3><div id="memoryStats" class="stat-grid"></div><div class="row"><input id="memorySearch" placeholder="Filter memories" oninput="renderMemory()"><select id="memoryTemp" onchange="renderMemory()"><option value="all">All temperatures</option><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option><option value="pinned">Pinned</option></select></div><textarea id="memoryNew" placeholder="Add a durable memory…" style="margin-top:7px"></textarea><button class="btn full" style="margin-top:6px" onclick="addMemory()">Add memory</button><div class="row"><button class="btn ghost" onclick="saveContext()">Summarize chat → memory</button><a id="memoryExport" class="btn ghost" style="text-align:center;text-decoration:none" download>Export ZIP</a></div><div class="row"><button class="btn ghost" onclick="analyzeMemory()">Find duplicates</button><button class="btn danger" onclick="optimizeMemory()">Merge strong duplicates</button></div><div id="memoryAnalysis" class="note" style="margin-top:7px">Optimizer is conservative and never rewrites memory text with a model.</div></div>
+        <div class="section"><h3>🧠 Memory Manager 3.6.11</h3><div id="memoryStats" class="stat-grid"></div><div class="row"><input id="memorySearch" placeholder="Filter memories" oninput="renderMemory()"><select id="memoryTemp" onchange="renderMemory()"><option value="all">All temperatures</option><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option><option value="pinned">Pinned</option></select></div><textarea id="memoryNew" placeholder="Add a durable memory…" style="margin-top:7px"></textarea><button class="btn full" style="margin-top:6px" onclick="addMemory()">Add memory</button><div class="row"><button class="btn ghost" onclick="saveContext()">Summarize chat → memory</button><a id="memoryExport" class="btn ghost" style="text-align:center;text-decoration:none" download>Export ZIP</a></div><div class="row"><button class="btn ghost" onclick="analyzeMemory()">Find duplicates</button><button class="btn danger" onclick="optimizeMemory()">Merge strong duplicates</button></div><div id="memoryAnalysis" class="note" style="margin-top:7px">Optimizer is conservative and never rewrites memory text with a model.</div></div>
         <div id="memoryList" class="memory-list"></div>
       </section>
 
@@ -202,7 +205,7 @@ html,body,button,input,textarea,select{font-family:var(--ui-font);font-stretch:s
         <div class="section"><h3>Context & memory</h3><label class="switch"><input id="autoMemory" type="checkbox"> Automatic long-term memory</label><label class="switch"><input id="autoSummary" type="checkbox"> Automatic rolling summaries</label><label class="switch"><input id="memoryRetrieval" type="checkbox"> Relevant memory retrieval</label><label class="switch"><input id="adaptiveContext" type="checkbox"> Adaptive context trimming</label><label class="label">Recent context messages</label><input id="recentContext" type="number" min="6" max="80"><button class="btn ghost full" style="margin-top:7px" onclick="saveSettings()">Save context settings</button></div>
         <div class="section"><h3>🟣 Discord chat bridge</h3><label class="switch"><input id="discordEnabled" type="checkbox"> Enable Discord bridge</label><label class="label">Bot token (leave blank to keep saved token)</label><input id="discordToken" type="password" autocomplete="off" placeholder="Stored privately, never returned to the UI"><label class="label">Server ID (optional)</label><input id="discordGuild"><label class="label">Channel ID</label><input id="discordChannel"><label class="label">Linked chat ID</label><input id="discordChat" type="number"><div class="row"><button class="btn" onclick="saveDiscord()">Save + reload</button><button class="btn danger" onclick="stopDiscord()">Stop</button></div><div id="discordInfo" class="note" style="margin-top:7px"></div></div>
         <div class="section"><h3>🔌 MCP Servers · AYCD</h3><div class="note">Zeno connects directly to AYCD's Streamable HTTP MCP endpoint. Browser and Discord both use this same MCP client path. Read-only tools can run automatically; tools that may change AYCD data require an explicit <b>approve</b> reply.</div><label class="switch"><input id="mcpAycdEnabled" type="checkbox"> Enable AYCD MCP</label><label class="label">AYCD MCP endpoint</label><input id="mcpAycdUrl" placeholder="http://127.0.0.1:42287/mcp"><label class="label">Bearer API key (leave blank to keep saved key)</label><input id="mcpAycdApiKey" type="password" autocomplete="off" placeholder="Stored privately in zeno_data/private"><div class="row"><label class="switch"><input id="mcpAycdAutoConnect" type="checkbox" checked> Probe on startup</label><label class="switch"><input id="mcpAycdAutoRoute" type="checkbox" checked> Auto-use when you mention AYCD</label></div><div class="row"><button class="btn" onclick="saveMcpAycd(true)">Save + connect</button><button class="btn ghost" onclick="testMcpAycd()">Test</button><button class="btn ghost" onclick="refreshMcpAycdTools()">Refresh tools</button></div><div id="mcpAycdInfo" class="update-state" style="margin-top:7px">MCP not checked yet.</div><div id="mcpAycdTools" class="job-log" style="margin-top:7px;max-height:220px;overflow:auto"><div class="note">Connect to AYCD to discover tools.</div></div></div><div class="section"><h3>📋 AYCD Control Center</h3><div class="note">Live view of AYCD jobs shared by browser chat and Discord. <b>!aycd generate N</b> prepares the exact requested synthetic batch up to 10,000 profiles with randomized name, phone and address fields. Email and card/payment data are never generated.</div><div class="row" style="margin-top:7px"><button class="btn" onclick="refreshAycdDashboard()">Refresh dashboard</button><button class="btn ghost" onclick="sendAycdQuick('!aycd generate 100')">Generate 100</button><button class="btn ghost" onclick="sendAycdQuick('!aycd generate 1000')">Generate 1,000</button><button class="btn ghost" onclick="sendAycdQuick('!aycd jobs active')">Active</button><button class="btn ghost" onclick="sendAycdQuick('!aycd jobs approval')">Approval</button></div><div id="aycdDashStats" class="stat-grid" style="margin-top:8px"></div><div id="aycdDashJobs" class="job-log" style="margin-top:7px;max-height:300px;overflow:auto"><div class="note">AYCD dashboard not loaded yet.</div></div></div>
-        <div class="section"><h3>🟠 AYCD inbound bridge</h3><div class="note">AYCD can POST into the same Zeno conversation used by Web Chat and, when the linked chat IDs match, Discord. This is the Zeno-side route; AYCD still needs to be configured to call it.</div><div id="aycdInfo" class="update-state" style="margin-top:7px">Checking AYCD route…</div><div class="row"><button class="btn ghost" onclick="refreshAycdRoute()">Check route</button><button class="btn ghost" onclick="copyAycdRoute()">Show request</button></div><div id="aycdRequest" class="job-log" style="display:none;max-height:180px;overflow:auto"></div></div>
+
         <div class="section"><h3>⬆ Zeno Updates</h3><div class="note">Checks public GitHub Releases, validates the ZIP, backs up the current app, and never replaces <span class="kbd">memory/</span>, <span class="kbd">zeno_data/</span>, browser profile, uploads, outputs, or private Discord data.</div><label class="label">GitHub repository</label><input id="updateRepo" placeholder="owner/repository"><label class="switch"><input id="autoUpdateCheck" type="checkbox"> Automatically check for new releases</label><div class="row"><button class="btn ghost" onclick="saveUpdateSettings()">Save</button><button class="btn ghost" onclick="checkUpdate(true)">Check now</button></div><div class="row"><button class="btn" onclick="downloadUpdate()">Download update</button><button class="btn danger" onclick="installUpdate()">Install + backup</button></div><div id="updateInfo" class="update-state">Updater ready.</div></div>
       </section>
     </div>
@@ -400,6 +403,82 @@ async function installUpdate(){if(!confirm('Install the downloaded Zeno update? 
 async function maybeAutoUpdateCheck(){if(!S?.settings?.auto_update_check)return;const last=Number(localStorage.getItem('zeno.lastUpdateCheck')||0);if(Date.now()-last<6*60*60*1000)return;await checkUpdate(false)}
 async function pollChatUpdates(){if(!S||busy){setTimeout(pollChatUpdates,1800);return}try{const r=await api('/api/chat/check?chat_id='+S.chat.id+'&after_id='+lastMessageId);if((r.messages||[]).length)await loadState(true,S.chat.id)}catch{}setTimeout(pollChatUpdates,1800)}
 window.addEventListener('load',async()=>{applyPanelState();try{const remembered=Number(localStorage.getItem('zeno.activeChatId')||0);await loadState(false,remembered||null);applyPanelState();setTimeout(pollChatUpdates,1800);setTimeout(pollGlobalActivity,350);scheduleBrowserPoll();setTimeout(maybeAutoUpdateCheck,1200)}catch(e){toast('Zeno failed to load: '+e.message)}});
+</script>
+<script id="zenoAycdCardFormatterScript">
+(function(){
+  function el(id){return document.getElementById(id)}
+  function cleanCell(v){return String(v??'').trim().replace(/^['"]|['"]$/g,'')}
+  function normalizeParts(line){
+    let s=String(line||'').trim();
+    if(!s || /^\|?\s*[-:]+(?:\s*\|\s*[-:]+)+\s*\|?$/.test(s)) return [];
+    let parts=[];
+    if(s.includes('|')) parts=s.split('|');
+    else if(s.includes('\t')) parts=s.split(/\t+/);
+    else if(s.includes(',')) parts=s.split(',');
+    else if(s.includes(':')) parts=s.split(':');
+    else parts=s.split(/\s{2,}|\s+/);
+    return parts.map(cleanCell).filter(Boolean);
+  }
+  function isNumber(v){return /^\d{12,19}$/.test(v)}
+  function isMonth(v){if(!/^\d{1,2}$/.test(v))return false;const n=Number(v);return n>=1&&n<=12}
+  function isYear(v){return /^(?:\d{2}|\d{4})$/.test(v)}
+  function isCvv(v){return /^\d{3,4}$/.test(v)}
+  function parseRow(parts){
+    if(parts.length<4)return null;
+    // Common 5-field AYCD shape: type, number, month, year, cvv
+    if(parts.length>=5 && isNumber(parts[1]) && isMonth(parts[2]) && isYear(parts[3]) && isCvv(parts[4])){
+      return {type:parts[0],number:parts[1],month:parts[2].padStart(2,'0'),year:parts[3],cvv:parts[4]};
+    }
+    // Common 4-field shape: number, month, year, cvv
+    if(isNumber(parts[0]) && isMonth(parts[1]) && isYear(parts[2]) && isCvv(parts[3])){
+      return {type:'',number:parts[0],month:parts[1].padStart(2,'0'),year:parts[2],cvv:parts[3]};
+    }
+    // Tolerate a label/index before the number by scanning a small window.
+    for(let i=0;i<=Math.min(parts.length-4,3);i++){
+      if(isNumber(parts[i]) && isMonth(parts[i+1]) && isYear(parts[i+2]) && isCvv(parts[i+3])){
+        const maybeType=i>0 && !/^\d+$/.test(parts[i-1]) ? parts[i-1] : '';
+        return {type:maybeType,number:parts[i],month:parts[i+1].padStart(2,'0'),year:parts[i+2],cvv:parts[i+3]};
+      }
+    }
+    return null;
+  }
+  window.formatAycdCardInfoLocal=function(){
+    const input=el('aycdCardInput'), output=el('aycdCardOutput'), status=el('aycdCardFormatStatus');
+    if(!input||!output||!status)return;
+    const mode=String(el('aycdCardFormatMode')?.value||'4');
+    const defaultType=cleanCell(el('aycdCardDefaultType')?.value||'');
+    const lines=String(input.value||'').split(/\r?\n/);
+    const out=[];let invalid=0,missingType=0;
+    for(const raw of lines){
+      const parts=normalizeParts(raw);
+      if(!parts.length)continue;
+      const row=parseRow(parts);
+      if(!row){invalid++;continue}
+      if(mode==='5'){
+        const type=cleanCell(row.type||defaultType);
+        if(!type){missingType++;continue}
+        out.push([type,row.number,row.month,row.year,row.cvv].join(':'));
+      }else{
+        out.push([row.number,row.month,row.year,row.cvv].join(':'));
+      }
+    }
+    output.value=out.join('\n');
+    const bits=[out.length+' formatted'];
+    if(invalid)bits.push(invalid+' skipped/invalid');
+    if(missingType)bits.push(missingType+' missing card type');
+    status.textContent=bits.join(' · ')+(mode==='5'&&missingType?' · Enter a default type or include type in those rows.':'');
+  };
+  window.copyAycdCardInfoLocal=async function(){
+    const output=el('aycdCardOutput'), status=el('aycdCardFormatStatus');if(!output)return;
+    const text=String(output.value||'');if(!text){if(status)status.textContent='Nothing to copy yet.';return}
+    try{await navigator.clipboard.writeText(text);if(status)status.textContent='Copied locally to clipboard · '+text.split(/\r?\n/).filter(Boolean).length+' row(s).';}
+    catch(e){output.focus();output.select();document.execCommand('copy');if(status)status.textContent='Copied locally to clipboard.';}
+  };
+  window.clearAycdCardInfoLocal=function(){
+    ['aycdCardInput','aycdCardOutput','aycdCardDefaultType'].forEach(id=>{const n=el(id);if(n)n.value=''});
+    const status=el('aycdCardFormatStatus');if(status)status.textContent='Cleared from this browser tab.';
+  };
+})();
 </script>
 <script id="zenoRecentUpgradeScript">
 /* ZENO_RECENT_UPGRADE_2026_08_28 */

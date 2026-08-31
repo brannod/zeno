@@ -1,4 +1,4 @@
-ZENO 3.6.9
+ZENO 3.6.11
 ==========
 
 Zeno is a private local assistant with a modular Python backend, LM Studio model
@@ -174,3 +174,25 @@ SCREEN READER RELIABILITY (3.5.0)
 - Stop / Universal Stop is checked immediately after each browser step and discards the remaining scan before analysis.
 - Browser step waits are bounded to keep Stop responsive.
 - The GUI shows elapsed time and explicitly labels Screen Reader as a one-time scan.
+
+
+AYCD LOCAL CARD INFO FORMATTER (3.6.10)
+---------------------------------------
+Settings includes a browser-only formatter for AYCD Card Info fields.
+Supported output shapes:
+- number:month:year:cvv
+- type:number:month:year:cvv
+
+The formatter is intentionally client-side only. Values entered there are not
+sent to Zeno chat, LM Studio, Discord, Python, MCP, logs, or localStorage.
+It does not infer card type from a number.
+
+
+AYCD CARD FORMATTER LOCATION + DISCORD (3.6.11)
+------------------------------------------------
+The local-only AYCD Card Info Formatter now lives under Files -> File Tools.
+Discord commands:
+  !cardcolon
+  !cardcolon5 TYPE
+Discord-triggered card formatting stores the output under Files -> Generated outputs
+and does not repost the formatted card/CVV rows into Discord.

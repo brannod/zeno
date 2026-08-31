@@ -11,3 +11,8 @@ ZENO 3.0 DISCORD GUIDE
 Discord is a chat interface to the same Zeno conversation/memory. Browser tools
 remain controlled by the standalone GUI unless a specific Discord command is
 implemented for that operation.
+
+AYCD local card formatting (v3.6.11):
+- !cardcolon       -> number:month:year:cvv
+- !cardcolon5 TYPE -> type:number:month:year:cvv
+Attach/reply to a text file. Formatted output is saved locally under Zeno Files -> Generated outputs and is not reposted into Discord.

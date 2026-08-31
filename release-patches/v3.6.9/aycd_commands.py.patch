@@ -1,0 +1,182 @@
+--- a/aycd_commands.py
++++ b/aycd_commands.py
+@@ -382,39 +382,148 @@
+     return bool(re.search(r"list|search|find|get|read|view|check|status|lookup|inspect|preview|count|show", name))
+ 
+ 
++def _schema_profile_signals(tool: dict[str, Any]) -> tuple[int, list[str]]:
++    """Return a conservative score + reasons that a tool creates Profile Builder records.
++
++    AYCD tool names are not guaranteed to contain the literal word ``profile``.
++    We therefore inspect the public MCP description and JSON input schema too, while
++    explicitly rejecting account/task/order style automation tools.
++    """
++    schema = tool.get("input_schema") or {}
++    props = schema.get("properties") or {} if isinstance(schema, dict) else {}
++    if not isinstance(props, dict):
++        props = {}
++
++    reasons: list[str] = []
++    score = 0
++    compact_props = {_norm_field(k) for k in props}
++
++    # Strong container signals used by profile/shipping-profile APIs.
++    for key in ("profiles", "profile", "profiledata", "shippingprofiles", "shippingprofile"):
++        if key in compact_props:
++            score += 9
++            reasons.append(f"schema:{key}")
++
++    # Direct identity/address shape. Require several independent fields before this
++    # contributes enough to classify a strangely-named tool.
++    identity = compact_props & {"firstname", "lastname", "fullname", "name", "phone", "phonenumber"}
++    address = compact_props & {"address", "address1", "addressline1", "street", "city", "state", "province", "zip", "zipcode", "postal", "postalcode", "country"}
++    if len(identity) >= 2:
++        score += 5
++        reasons.append("schema:identity")
++    if len(address) >= 3:
++        score += 7
++        reasons.append("schema:address")
++    if identity and address:
++        score += 4
++        reasons.append("schema:identity+address")
++
++    # Array item schemas are common for bulk creation.
++    for key, meta in props.items():
++        if not isinstance(meta, dict) or str(meta.get("type") or "") != "array":
++            continue
++        item = meta.get("items") or {}
++        item_props = item.get("properties") or {} if isinstance(item, dict) else {}
++        if not isinstance(item_props, dict):
++            continue
++        item_keys = {_norm_field(k) for k in item_props}
++        item_identity = item_keys & {"firstname", "lastname", "fullname", "name", "phone", "phonenumber"}
++        item_address = item_keys & {"address", "address1", "addressline1", "street", "city", "state", "province", "zip", "zipcode", "postal", "postalcode", "country"}
++        if _norm_field(key) in {"profiles", "profiledata", "shippingprofiles", "records", "items"} and (item_identity or item_address):
++            score += 11
++            reasons.append(f"array:{key}")
++        if len(item_identity) >= 2 and len(item_address) >= 2:
++            score += 8
++            reasons.append(f"array-shape:{key}")
++
++    return score, reasons
++
++
+ def _profile_write_tool(tools: list[dict[str, Any]]) -> dict[str, Any] | None:
+-    """Pick only an unambiguous Profile Builder create tool.
+-
+-    Generic account/task creation tools are deliberately excluded. The old fuzzy
+-    matcher could select create_account_task merely because its description
+-    mentioned profiles, which is unsafe and produces bogus required fields such
+-    as username.
++    """Find a Profile Builder create/generate tool using name, description AND schema.
++
++    v3.6.7 intentionally made matching very strict after ``create_account_task`` was
++    selected by mistake. AYCD can however expose a legitimate Profile Builder tool
++    whose *name* does not literally contain ``profile``. This matcher keeps the hard
++    exclusions, then accepts a tool only when its description/schema strongly proves
++    that it creates profile/address records.
+     """
+-    ranked = []
++    ranked: list[tuple[int, dict[str, Any]]] = []
+     for tool in tools:
+         name = str(tool.get("name") or "").casefold()
+         desc = str(tool.get("description") or "").casefold()
+         text = f"{name} {desc}"
+-        # Creation must be explicit and the TOOL NAME itself must be profile-oriented.
+-        if "profile" not in name:
++
++        # Hard negative families. These must never be reinterpreted as Profile Builder.
++        if re.search(r"(?:^|[_\- ])(?:account|task|checkout|order|cart|session|login|credential|password|payment|card)(?:$|[_\- ])", name):
+             continue
+-        if not re.search(r"(?:^|[_\- ])(create|generate|add|build|import)(?:$|[_\- ])", name):
+-            continue
+-        # Never reinterpret account/task automation as Profile Builder creation.
+-        if re.search(r"(?:^|[_\- ])(?:account|task|checkout|order)(?:$|[_\- ])", name):
+-            continue
+-        if re.search(r"duplicate|list|search|find|jig|distribute|spreadsheet|google.?forms|mass.?edit", name):
++        if re.search(r"duplicate|list|search|find|jig|distribute|spreadsheet|google.?forms|mass.?edit|delete|remove", name):
+             continue
+         if _is_read_only(tool):
+             continue
+-        score = 20
+-        if "profile builder" in text: score += 6
+-        if "profiles" in name: score += 3
+-        if re.search(r"(?:^|[_\- ])(?:create|generate)(?:$|[_\- ])", name): score += 3
++
++        creation_name = bool(re.search(r"(?:^|[_\- ])(?:create|generate|add|build|import|insert|new|make)(?:$|[_\- ])", name))
++        creation_desc = bool(re.search(r"\b(?:create|generate|add|build|import|insert|make)\b", desc))
++        if not (creation_name or creation_desc):
++            continue
++
++        score = 0
++        if creation_name:
++            score += 8
++        if creation_desc:
++            score += 3
++        if "profile" in name:
++            score += 15
++        if "profile builder" in text:
++            score += 14
++        elif "profile" in desc:
++            score += 7
++        if "shipping profile" in text or "billing profile" in text:
++            score += 9
++        if "address" in name and ("create" in name or "generate" in name):
++            score += 3
++
++        schema_score, _reasons = _schema_profile_signals(tool)
++        score += schema_score
++
++        # Required account-auth fields are a strong sign this is the wrong subsystem.
++        required = {_norm_field(x) for x in _required_args(tool)}
++        if required & {"username", "password", "login", "credential", "accountid", "taskid"}:
++            continue
++
++        # Safety threshold: either explicit profile semantics, or a strongly profile-
++        # shaped schema plus a creation verb. This still rejects create_account_task.
++        explicit_profile = ("profile" in name or "profile builder" in text or "shipping profile" in text or "billing profile" in text)
++        if explicit_profile:
++            if score < 18:
++                continue
++        else:
++            if schema_score < 14 or score < 22:
++                continue
++
+         ranked.append((score, tool))
++
+     ranked.sort(key=lambda pair: (-pair[0], str(pair[1].get("name") or "")))
+     return ranked[0][1] if ranked else None
+ 
++
++def _profile_tool_diagnostics(tools: list[dict[str, Any]], limit: int = 5) -> str:
++    """Compact user-facing hints when no safe creation tool can be selected."""
++    rows: list[tuple[int, str]] = []
++    for tool in tools:
++        name = str(tool.get("name") or "")
++        low = name.casefold()
++        if re.search(r"(?:account|task|checkout|order|cart|login|payment|card)", low):
++            continue
++        desc = str(tool.get("description") or "").casefold()
++        schema_score, _ = _schema_profile_signals(tool)
++        score = schema_score + (8 if "profile" in low else 0) + (5 if "profile" in desc else 0) + (4 if re.search(r"create|generate|build|add|make", low) else 0)
++        if score > 0:
++            rows.append((score, name))
++    rows.sort(key=lambda x: (-x[0], x[1]))
++    if not rows:
++        return ""
++    return " Closest non-blocked MCP tool names: " + ", ".join(name for _, name in rows[:limit]) + "."
+ 
+ def _duplicate_tool(tools: list[dict[str, Any]]) -> dict[str, Any] | None:
+     ranked = []
+@@ -801,7 +910,10 @@
+         except Exception as exc: return _update_job(job_code,status="failed",error=f"{type(exc).__name__}: {exc}")
+         finally: _ACTIVE_EVENTS.pop(str(job_code).upper(),None)
+     tool = _profile_write_tool(mcp_tools(MCP_DEFAULT_SERVER_ID))
+-    if not tool: return _update_job(job_code,status="waiting_tool",error="AYCD MCP did not expose an obvious profile create/generate tool. Run !aycd tools.")
++    if not tool:
++        live_tools = mcp_tools(MCP_DEFAULT_SERVER_ID)
++        hint = _profile_tool_diagnostics(live_tools)
++        return _update_job(job_code,status="waiting_tool",error="AYCD MCP is connected, but Zeno could not safely identify a Profile Builder create/generate tool." + hint + " Run !aycd tools if you want to inspect the full live tool list.")
+     mode, args, missing = _profile_call_plan(tool, job)
+     if missing:
+         cardish = [x for x in missing if _PAYMENT_FIELD_RE.search(str(x).replace("-", "_"))]

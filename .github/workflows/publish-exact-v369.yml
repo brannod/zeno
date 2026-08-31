@@ -1,0 +1,61 @@
+name: Publish exact Zeno v3.6.9 tag
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download verified existing updater asset
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/zeno-v369
+          gh release download 'v3.6.9' \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip' \
+            --dir /tmp/zeno-v369
+          ASSET='/tmp/zeno-v369/Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip'
+          test "$(stat -c '%s' "$ASSET")" = '341976'
+          echo 'dae3b08dc4d8f513992528e53b2a2fe8c830ba3865ab7cb1fbcff1b3058da872  '"$ASSET" | sha256sum -c -
+
+      - name: Create requested release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG='v.3.6.9'
+          TITLE='Zeno v3.6.9'
+          ASSET='/tmp/zeno-v369/Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip'
+          cat > /tmp/notes.md <<'EOF'
+          Zeno 3.6.9 Direct Work + Long Replies.
+
+          Includes Direct Work file handling, deterministic Discord file commands, expanded reply limits, and AYCD Profile Builder tool discovery improvements.
+          EOF
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$ASSET" --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file /tmp/notes.md --latest
+          else
+            gh release create "$TAG" "$ASSET" \
+              --repo "$GITHUB_REPOSITORY" \
+              --target main \
+              --title "$TITLE" \
+              --notes-file /tmp/notes.md \
+              --latest
+          fi
+
+      - name: Verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view 'v.3.6.9' --repo "$GITHUB_REPOSITORY" --json name,tagName,isLatest,assets,url

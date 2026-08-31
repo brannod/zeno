@@ -1,0 +1,29 @@
+--- a/app.html
++++ b/app.html
+@@ -3,7 +3,7 @@
+ <head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+-<title>Zeno 3.6.7</title>
++<title>Zeno 3.6.9</title>
+ <link rel="icon" href="/zeno-icon.png">
+ <style>
+ :root{--bg:#07090d;--side:#0d1017;--panel:#11151e;--panel2:#171c27;--line:#293141;--text:#f2f4fa;--muted:#929bad;--red:#e13d50;--red2:#ff6676;--red3:#6d202b;--green:#55d6a9;--amber:#efbd63;--blue:#6aa9ff;--shadow:#0008}
+@@ -112,7 +112,7 @@
+ <body>
+ <div id="appRoot" class="app">
+   <aside class="sidebar">
+-    <div class="brand"><div class="logo"><img src="/zeno-icon.png" alt="Zeno"></div><div><h1>Zeno</h1><small id="version">3.6.7 · LOCAL</small></div></div>
++    <div class="brand"><div class="logo"><img src="/zeno-icon.png" alt="Zeno"></div><div><h1>Zeno</h1><small id="version">3.6.9 · LOCAL</small></div></div>
+     <div class="sidebar-controls"><button class="btn full" onclick="newChat()">＋ New chat</button><input id="chatSearch" class="search" placeholder="Search chats" oninput="renderChats()"></div>
+     <div id="chatList" class="chat-list"></div>
+     <div class="sidebar-foot"><div id="sideStatus">Starting Zeno…</div><div style="margin-top:5px">Your data stays in the local <span class="kbd">memory/</span> and <span class="kbd">zeno_data/</span> folders.</div></div>
+@@ -187,7 +187,7 @@
+       </section>
+ 
+       <section id="tool-memory" class="tool-panel">
+-        <div class="section"><h3>🧠 Memory Manager 3.6.7</h3><div id="memoryStats" class="stat-grid"></div><div class="row"><input id="memorySearch" placeholder="Filter memories" oninput="renderMemory()"><select id="memoryTemp" onchange="renderMemory()"><option value="all">All temperatures</option><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option><option value="pinned">Pinned</option></select></div><textarea id="memoryNew" placeholder="Add a durable memory…" style="margin-top:7px"></textarea><button class="btn full" style="margin-top:6px" onclick="addMemory()">Add memory</button><div class="row"><button class="btn ghost" onclick="saveContext()">Summarize chat → memory</button><a id="memoryExport" class="btn ghost" style="text-align:center;text-decoration:none" download>Export ZIP</a></div><div class="row"><button class="btn ghost" onclick="analyzeMemory()">Find duplicates</button><button class="btn danger" onclick="optimizeMemory()">Merge strong duplicates</button></div><div id="memoryAnalysis" class="note" style="margin-top:7px">Optimizer is conservative and never rewrites memory text with a model.</div></div>
++        <div class="section"><h3>🧠 Memory Manager 3.6.9</h3><div id="memoryStats" class="stat-grid"></div><div class="row"><input id="memorySearch" placeholder="Filter memories" oninput="renderMemory()"><select id="memoryTemp" onchange="renderMemory()"><option value="all">All temperatures</option><option value="hot">Hot</option><option value="warm">Warm</option><option value="cold">Cold</option><option value="pinned">Pinned</option></select></div><textarea id="memoryNew" placeholder="Add a durable memory…" style="margin-top:7px"></textarea><button class="btn full" style="margin-top:6px" onclick="addMemory()">Add memory</button><div class="row"><button class="btn ghost" onclick="saveContext()">Summarize chat → memory</button><a id="memoryExport" class="btn ghost" style="text-align:center;text-decoration:none" download>Export ZIP</a></div><div class="row"><button class="btn ghost" onclick="analyzeMemory()">Find duplicates</button><button class="btn danger" onclick="optimizeMemory()">Merge strong duplicates</button></div><div id="memoryAnalysis" class="note" style="margin-top:7px">Optimizer is conservative and never rewrites memory text with a model.</div></div>
+         <div id="memoryList" class="memory-list"></div>
+       </section>
+ 

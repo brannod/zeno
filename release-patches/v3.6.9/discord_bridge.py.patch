@@ -1,0 +1,271 @@
+--- a/discord_bridge.py
++++ b/discord_bridge.py
+@@ -59,6 +59,8 @@
+     clear_all_uploaded_files,
+     create_generated_file,
+     extract_generated_file_blocks,
++    extracted_email_lines,
++    EMAIL_ADDRESS_RE,
+     read_generated_file,
+     stable_unique_lines,
+     store_generated_file,
+@@ -342,7 +344,7 @@
+             repeats += 1
+         else:
+             seen.add(key)
+-    return repeats >= 1 or len(str(text)) > 12_000
++    return repeats >= 1
+ 
+ 
+ def sanitize_discord_answer(answer: str, user_message: str, no_code: bool = False) -> str:
+@@ -394,8 +396,6 @@
+             if len(key) >= 35:
+                 seen.add(key)
+             kept.append(paragraph)
+-            if len("\n\n".join(kept)) >= 5000:
+-                break
+         value = "\n\n".join(kept).strip()
+ 
+     if no_code or NO_CODE_REQUEST_RE.search(str(user_message or "")):
+@@ -404,7 +404,7 @@
+     value = re.sub(r"(?im)^\s*Downloadable-file capability:\s*$", "", value)
+     value = re.sub(r"\n{3,}", "\n\n", value).strip()
+     if had_file_block and asks_about_files and not value:
+-        value = "Use `!file <instruction>` with the attachment so Zeno can process and return it through Discord."
++        value = "The requested file operation completed, but the generated-file payload is not rendered inline in Discord."
+     return value
+ 
+ 
+@@ -556,6 +556,7 @@
+ def discord_transform_payload(raw: bytes, filename: str, mode: str) -> tuple[bytes, str, dict[str, int]]:
+     text, encoding, newline, trailing_newline = discord_decode_text_payload(raw)
+     input_lines = text.splitlines()
++    converted = 0
+     if mode == "brand_proxy_scramble":
+         if len(input_lines) < 2:
+             raise ValueError("!scramble needs at least two complete lines.")
+@@ -564,15 +565,67 @@
+     elif mode == "dedupe_lines":
+         output_lines = stable_unique_lines(input_lines)
+         label = "deduplicated"
++    elif mode == "sort_lines":
++        output_lines = sorted(input_lines, key=lambda value: (value.casefold(), value))
++        label = "sorted"
++    elif mode == "remove_blank_lines":
++        output_lines = [line for line in input_lines if line.strip()]
++        label = "without_blanks"
++    elif mode == "extract_emails":
++        output_lines = extracted_email_lines(input_lines)
++        label = "emails"
++    elif mode == "duplicate_emails":
++        occurrences: list[tuple[str, str]] = []
++        counts: dict[str, int] = {}
++        first_spelling: dict[str, str] = {}
++        for line in input_lines:
++            for found in EMAIL_ADDRESS_RE.findall(line):
++                key = found.casefold()
++                counts[key] = counts.get(key, 0) + 1
++                first_spelling.setdefault(key, found)
++        output_lines = [first_spelling[key] for key, count in counts.items() if count > 1]
++        label = "duplicate_emails"
++    elif mode == "email_colon":
++        output_lines = []
++        for line in input_lines:
++            # email:password -> email:::password. Preserve the exact email and
++            # everything after the first colon; already-triple-colon rows stay unchanged.
++            if ":::" in line:
++                output_lines.append(line)
++                continue
++            if ":" not in line:
++                output_lines.append(line)
++                continue
++            left, right = line.split(":", 1)
++            if EMAIL_ADDRESS_RE.fullmatch(left.strip()):
++                prefix_ws = left[:len(left) - len(left.lstrip())]
++                suffix_ws = left[len(left.rstrip()):]
++                email_value = left.strip()
++                output_lines.append(prefix_ws + email_value + suffix_ws + ":::" + right)
++                converted += 1
++            else:
++                output_lines.append(line)
++        label = "emailcolon"
++        if len(output_lines) != len(input_lines):
++            raise RuntimeError("!emailcolon validation failed: line count changed.")
++        for before, after in zip(input_lines, output_lines):
++            if before == after:
++                continue
++            left_before, right_before = before.split(":", 1)
++            left_after, right_after = after.split(":::", 1)
++            if left_before.strip() != left_after.strip() or right_before != right_after:
++                raise RuntimeError("!emailcolon validation failed: a credential value changed.")
+     else:
+         raise ValueError("Unsupported Discord file command.")
+ 
+-    validation = validate_file_transform(input_lines, output_lines, mode, "Discord local command", {})
+-    if not validation.get("passed"):
+-        raise RuntimeError(
+-            "Zeno stopped the Discord file command because validation failed: "
+-            + "; ".join(validation.get("reasons") or [])
+-        )
++    if mode not in {"email_colon", "duplicate_emails"}:
++        validation = validate_file_transform(input_lines, output_lines, mode, "Discord local command", {})
++        if not validation.get("passed"):
++            raise RuntimeError(
++                "Zeno stopped the Discord file command because validation failed: "
++                + "; ".join(validation.get("reasons") or [])
++            )
++
+     result = newline.join(output_lines) + (newline if trailing_newline else "")
+     output_raw = result.encode(encoding)
+     source = Path(re.sub(r"[^A-Za-z0-9._ -]", "_", filename or "discord-list.txt")).name
+@@ -583,6 +636,10 @@
+         "input_lines": len(input_lines),
+         "output_lines": len(output_lines),
+         "removed_duplicates": max(0, len(input_lines) - len(output_lines)) if mode == "dedupe_lines" else 0,
++        "removed_blank_lines": max(0, len(input_lines) - len(output_lines)) if mode == "remove_blank_lines" else 0,
++        "extracted_emails": len(output_lines) if mode == "extract_emails" else 0,
++        "duplicate_emails": len(output_lines) if mode == "duplicate_emails" else 0,
++        "converted_lines": converted if mode == "email_colon" else 0,
+     }
+     return output_raw, output_name, stats
+ 
+@@ -598,11 +655,18 @@
+     wants_dedupe = bool(re.search(r"\b(remove|delete|drop)\b.{0,25}\b(exact )?duplicates?\b|\bdedupe\b", lowered))
+     wants_sort = bool(re.search(r"\bsort\b.{0,20}\b(a.?z|alphabetical|ascending)\b|\bsort lines?\b", lowered))
+     wants_remove_blank = bool(re.search(r"\b(remove|delete|drop)\b.{0,25}\b(blank|empty)\b.{0,15}\blines?\b", lowered))
++    wants_extract_emails = bool(re.search(r"\bextract\b.{0,25}\bemails?\b|\bget\b.{0,20}\bemails?\b", lowered))
++    wants_emailcolon = bool(
++        "emailcolon" in lowered
++        or "email:::password" in lowered
++        or re.search(r"email\s*:\s*password.{0,30}email\s*:::\s*password", lowered)
++        or re.search(r"convert.{0,40}\bcolon\b.{0,40}triple", lowered)
++    )
+     prepend_match = re.search(
+         r"(?i)\bprepend\s+(?:the\s+text\s+)?(?:\"([^\"]+)\"|'([^']+)'|`([^`]+)`|([^,;]{1,80}?))\s+(?:to\s+)?(?:each|every)\s+line\b",
+         request,
+     )
+-    if not any((wants_scramble, wants_dedupe, wants_sort, wants_remove_blank, prepend_match)):
++    if not any((wants_scramble, wants_dedupe, wants_sort, wants_remove_blank, wants_extract_emails, wants_emailcolon, prepend_match)):
+         return None
+ 
+     text, encoding, newline, trailing_newline = discord_decode_text_payload(raw)
+@@ -625,6 +689,24 @@
+     if wants_sort:
+         output_lines = sorted(output_lines, key=lambda value: (value.casefold(), value))
+         actions.append("sorted lines A-Z")
++    if wants_extract_emails:
++        output_lines = extracted_email_lines(output_lines)
++        actions.append("extracted email addresses")
++    if wants_emailcolon:
++        converted_lines: list[str] = []
++        changed = 0
++        for line in output_lines:
++            if ":::" in line or ":" not in line:
++                converted_lines.append(line)
++                continue
++            left, right = line.split(":", 1)
++            if EMAIL_ADDRESS_RE.fullmatch(left.strip()):
++                converted_lines.append(left + ":::" + right)
++                changed += 1
++            else:
++                converted_lines.append(line)
++        output_lines = converted_lines
++        actions.append(f"converted {changed:,} email:password row(s) to email:::password")
+     if wants_scramble:
+         if len(output_lines) < 2:
+             raise ValueError("Scrambling needs at least two complete lines.")
+@@ -907,7 +989,7 @@
+         _model, _method, iterator = stream_completion(
+             [{"role": "system", "content": system}, {"role": "user", "content": user_message}],
+             model_stop,
+-            max_tokens=8000,
++            max_tokens=12000,
+             temperature=0.15,
+             model_mode=None,
+             user_message=request_text,
+@@ -1101,6 +1183,11 @@
+         "`!file <instruction>` — transform an attached/replied-to supported file and return the result.\n"
+         "`!scramble` — shuffle complete lines while preserving every record.\n"
+         "`!removedupes` — remove exact duplicate lines while preserving first-seen order.\n"
++        "`!emailcolon` — convert `email:password` rows to `email:::password` without changing either value.\n"
++        "`!extractemails` — extract email addresses from an attached/replied text file.\n"
++        "`!dupeemails` — list email addresses that occur more than once in the attached/replied file.\n"
++        "`!sortlines` — sort complete lines A-Z.\n"
++        "`!removeblanks` — remove blank/empty lines.\n"
+         "`!aycd` / `!aycd help` — AYCD Profile Builder commands, jobs, tools, recipes, and reaction legend.\n"
+         "Normal messages chat with the same Zeno conversation used by the desktop/browser UI."
+     )
+@@ -2027,37 +2114,37 @@
+                     )
+                     return True
+                 raw, filename = await self._read_attachment(attachment)
+-                if command == "!scramble":
++                direct_modes = {
++                    "!scramble": ("brand_proxy_scramble", "discord-scramble"),
++                    "!removedupes": ("dedupe_lines", "discord-dedupe"),
++                    "!emailcolon": ("email_colon", "discord-emailcolon"),
++                    "!extractemails": ("extract_emails", "discord-extractemails"),
++                    "!dupeemails": ("duplicate_emails", "discord-dupeemails"),
++                    "!sortlines": ("sort_lines", "discord-sortlines"),
++                    "!removeblanks": ("remove_blank_lines", "discord-removeblanks"),
++                }
++                if command in direct_modes:
++                    mode, source_job_id = direct_modes[command]
+                     output_raw, output_name, stats = await asyncio.to_thread(
+-                        discord_transform_payload, raw, filename, "brand_proxy_scramble"
++                        discord_transform_payload, raw, filename, mode
+                     )
+                     stored = await asyncio.to_thread(
+-                        store_generated_file,
+-                        chat_id,
+-                        output_name,
+-                        output_raw,
+-                        source_job_id="discord-scramble",
++                        store_generated_file, chat_id, output_name, output_raw, source_job_id=source_job_id
+                     )
+-                    answer = f"Scrambled **{stats['input_lines']:,}** complete line(s); every record was preserved."
+-                    append_chat_message(chat_id, "user", content, source="discord", source_label=author_name, external_id=external_id)
+-                    assistant_id = append_chat_message(chat_id, "assistant", answer, source="discord", source_label="Zeno", attachments=[stored], external_id=external_id)
+-                    with db_connect() as db:
+-                        db.execute("UPDATE generated_files SET source_message_id=? WHERE id=?", (assistant_id, int(stored["id"])))
+-                elif command == "!removedupes":
+-                    output_raw, output_name, stats = await asyncio.to_thread(
+-                        discord_transform_payload, raw, filename, "dedupe_lines"
+-                    )
+-                    stored = await asyncio.to_thread(
+-                        store_generated_file,
+-                        chat_id,
+-                        output_name,
+-                        output_raw,
+-                        source_job_id="discord-dedupe",
+-                    )
+-                    answer = (
+-                        f"Removed **{stats['removed_duplicates']:,}** exact duplicate line(s) · "
+-                        f"**{stats['output_lines']:,}** line(s) remain."
+-                    )
++                    if command == "!scramble":
++                        answer = f"Scrambled **{stats['input_lines']:,}** complete line(s); every record was preserved."
++                    elif command == "!removedupes":
++                        answer = f"Removed **{stats['removed_duplicates']:,}** exact duplicate line(s) · **{stats['output_lines']:,}** line(s) remain."
++                    elif command == "!emailcolon":
++                        answer = f"Converted **{stats['converted_lines']:,}** `email:password` row(s) to `email:::password` · **{stats['output_lines']:,}** line(s) preserved."
++                    elif command == "!extractemails":
++                        answer = f"Extracted **{stats['extracted_emails']:,}** unique email address(es)."
++                    elif command == "!dupeemails":
++                        answer = f"Found **{stats['duplicate_emails']:,}** email address(es) that occur more than once."
++                    elif command == "!sortlines":
++                        answer = f"Sorted **{stats['output_lines']:,}** complete line(s) A-Z."
++                    else:
++                        answer = f"Removed **{stats['removed_blank_lines']:,}** blank line(s) · **{stats['output_lines']:,}** line(s) remain."
+                     append_chat_message(chat_id, "user", content, source="discord", source_label=author_name, external_id=external_id)
+                     assistant_id = append_chat_message(chat_id, "assistant", answer, source="discord", source_label="Zeno", attachments=[stored], external_id=external_id)
+                     with db_connect() as db:
+@@ -2299,7 +2386,7 @@
+                     else:
+                         await message.reply(file=discord.File(io.BytesIO(raw), filename="zeno-browser.jpg"), mention_author=False, allowed_mentions=discord.AllowedMentions.none())
+                     return True
+-                if command in {"!file", "!scramble", "!removedupes"}:
++                if command in {"!file", "!scramble", "!removedupes", "!emailcolon", "!extractemails", "!dupeemails", "!sortlines", "!removeblanks"}:
+                     return await self._handle_file_command(message, command, content, author_name, external_id)
+                 return False
+ 

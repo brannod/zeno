@@ -1,4 +1,4 @@
-name: Finalize Zeno v3.6.9
+name: Finalize Zeno v3.6.9 exact tag
 
 on:
   push:
@@ -16,81 +16,24 @@ jobs:
     steps:
       - name: Check out main
         uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
 
-      - name: Apply Zeno 3.6.9 patches
+      - name: Download verified 3.6.9 updater asset
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          for PATCH in \
-            release-patches/v3.6.9/aycd_commands.py.patch \
-            release-patches/v3.6.9/config.py.patch \
-            release-patches/v3.6.9/app.html.patch \
-            release-patches/v3.6.9/context.py.patch \
-            release-patches/v3.6.9/discord_bridge.py.patch \
-            release-patches/v3.6.9/model_api.py.patch \
-            release-patches/v3.6.9/VERSION.patch \
-            release-patches/v3.6.9/README.txt.patch
-          do
-            test -f "$PATCH"
-            git apply --check "$PATCH"
-            git apply "$PATCH"
-          done
+          rm -rf /tmp/zeno-v369
+          mkdir -p /tmp/zeno-v369
+          gh release download 'v3.6.9' \
+            --pattern 'Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip' \
+            --dir /tmp/zeno-v369
+          ASSET='/tmp/zeno-v369/Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip'
+          test -f "$ASSET"
+          test "$(stat -c '%s' "$ASSET")" = '341976'
+          echo 'dae3b08dc4d8f513992528e53b2a2fe8c830ba3865ab7cb1fbcff1b3058da872  '"$ASSET" | sha256sum -c -
 
-      - name: Validate patched source
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(tr -d '\r\n ' < VERSION)" = "v3.6.9"
-          grep -q 'APP_VERSION = "3.6.9"' config.py
-          for FILE in ./*.py; do python -m py_compile "$FILE"; done
-          python zeno.py --check
-
-      - name: Build complete updater ZIP
-        shell: bash
-        run: |
-          set -euo pipefail
-          rm -rf dist
-          mkdir -p dist/Zeno
-          cp ./*.py dist/Zeno/
-
-          FILES=(
-            app.html
-            VERSION
-            requirements.txt
-            START_ZENO.bat
-            INSTALL_ZENO.bat
-            README.txt
-            FIRST_TIME_USER_GUIDE.txt
-            DISCORD_GUIDE.txt
-            ZENO_3.0_INTEGRATION_AUDIT.txt
-            DISCORD_TOKEN.example.txt
-          )
-          for FILE in "${FILES[@]}"; do
-            if [ -f "$FILE" ]; then cp "$FILE" dist/Zeno/; fi
-          done
-
-          for FILE in zeno-icon.png zeno-wallpaper.svg zeno.ico; do
-            if [ -f "$FILE" ]; then cp "$FILE" dist/Zeno/; fi
-          done
-
-          cat > dist/Zeno/RELEASE_NOTES_v3.6.9.txt <<'EOF'
-          Zeno 3.6.9 - Direct Work + Long Replies
-          - Supplied files are usable working data for user-requested analysis and transformations.
-          - Restores deterministic Discord file commands including !emailcolon, !extractemails, !dupeemails, !sortlines and !removeblanks.
-          - Raises long-answer output budgets and removes the Discord 12,000-character false loop cutoff.
-          - Includes AYCD Profile Builder tool-discovery improvements from 3.6.8.
-          EOF
-
-          rm -f dist/Zeno/DISCORD_TOKEN.txt
-          rm -rf dist/Zeno/memory dist/Zeno/zeno_data dist/Zeno/__pycache__
-
-          (cd dist && zip -qr Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip Zeno)
-          sha256sum dist/Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip
-
-      - name: Publish exact GitHub release
+      - name: Publish requested exact release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -98,15 +41,11 @@ jobs:
           set -euo pipefail
           TAG='v.3.6.9'
           TITLE='Zeno v3.6.9'
-          ASSET='dist/Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip'
+          ASSET='/tmp/zeno-v369/Zeno_v3.6.9_COMPLETE_GITHUB_UPDATER_RELEASE.zip'
           cat > /tmp/release-notes.md <<'EOF'
           Zeno 3.6.9 Direct Work + Long Replies.
 
-          Highlights:
-          - Direct file analysis/transform behavior for user-supplied files.
-          - `!emailcolon`, `!extractemails`, `!dupeemails`, `!sortlines`, `!removeblanks`.
-          - Larger browser/Discord answer budgets and long-message preservation.
-          - AYCD Profile Builder tool-discovery improvements.
+          Includes Direct Work file behavior, restored deterministic Discord file commands, larger browser/Discord reply limits, and AYCD Profile Builder tool-discovery improvements.
           EOF
 
           if gh release view "$TAG" >/dev/null 2>&1; then
@@ -114,13 +53,13 @@ jobs:
             gh release edit "$TAG" --title "$TITLE" --notes-file /tmp/release-notes.md --latest
           else
             gh release create "$TAG" "$ASSET" \
-              --target "$GITHUB_SHA" \
+              --target main \
               --title "$TITLE" \
               --notes-file /tmp/release-notes.md \
               --latest
           fi
 
-      - name: Verify release asset
+      - name: Verify exact release
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}

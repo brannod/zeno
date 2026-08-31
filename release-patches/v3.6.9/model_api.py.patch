@@ -1,0 +1,11 @@
+--- a/model_api.py
++++ b/model_api.py
+@@ -449,7 +449,7 @@
+     return max(0.0, min(number, maximum))
+ 
+ 
+-def _max_tokens(value: int, *, minimum: int, maximum: int = 8000) -> int:
++def _max_tokens(value: int, *, minimum: int, maximum: int = 12000) -> int:
+     try:
+         number = int(value)
+     except (TypeError, ValueError) as exc:

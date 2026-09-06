@@ -1,4 +1,4 @@
-ZENO 3.0 DISCORD GUIDE
+ZENO 3.6.14 DISCORD GUIDE
 
 1. Create a Discord application/bot in the Discord Developer Portal.
 2. Enable Message Content Intent for the bot.
@@ -12,7 +12,18 @@ Discord is a chat interface to the same Zeno conversation/memory. Browser tools
 remain controlled by the standalone GUI unless a specific Discord command is
 implemented for that operation.
 
-AYCD local card formatting (v3.6.11):
+Zeno uses prefix commands only (for example `!help`); slash commands are not
+registered or required.
+
+List comparison:
+- `!comparelist` or `!listcompare` with exactly two attached text files lists
+  entries shared by both lists (case-insensitive, trimmed matching).
+- `!listmissing` with exactly two attached text files lists entries found only
+  in List A and only in List B.
+- Large comparison results and large normal replies are sent as complete UTF-8
+  `.txt` attachments instead of being truncated by Discord's message limit.
+
+AYCD local card formatting (v3.6.14):
 - !cardcolon       -> number:month:year:cvv
 - !cardcolon5 TYPE -> type:number:month:year:cvv
 Attach/reply to a text file. Formatted output is saved locally under Zeno Files -> Generated outputs and is not reposted into Discord.

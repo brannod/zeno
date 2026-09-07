@@ -26,7 +26,7 @@ FIRST SETTINGS
 - Settings -> API Providers: enter an exact provider model ID and key, save it,
   then test it. A provider-side HTTP 4xx/5xx response is not automatically a
   bad key; read the returned status detail.
-- Settings -> MCP Servers: configure AYCD only if its MCP endpoint is running.
+- Files -> AYCD / MCP tools: configure AYCD only if its MCP endpoint is running.
 - Settings -> Zeno Updates: confirm the repository is brannod/zeno.
 
 FILES AND FILE WORKER
@@ -44,7 +44,8 @@ DISCORD LIST TOOLS
 Attach two text files to one message and use `!comparelist` (or `!listcompare`)
 to list shared entries, or `!listmissing` to list entries unique to each file.
 Discord uses prefix commands only. Oversized replies are delivered as .txt
-files so complete output is preserved.
+files so complete output is preserved. File transforms return a downloadable
+attachment; sensitive card values are kept out of the message body.
 
 SAFETY AND DATA
 ---------------

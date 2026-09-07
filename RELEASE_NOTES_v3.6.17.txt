@@ -1,0 +1,5 @@
+ZENO 3.6.17 - DISCORD REPLY HOTFIX
+
+- Fixed normal Discord replies failing with `name 'discord' is not defined`.
+- Loaded the optional discord.py module at module scope so text and file helpers work reliably.
+- Kept Discord attachment round-tripping, long-response text files, and provider stream retry behavior.

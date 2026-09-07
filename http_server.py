@@ -26,12 +26,14 @@ from config import (
     APP_PORT,
     APP_VERSION,
     BASE_DIR,
+    DEFAULT_PERSONALITY,
     HTML_PATH,
     ICON_PATH,
     WALLPAPER_PATH,
     MAX_REQUEST_BYTES,
     MAX_UPLOAD_BYTES,
     MEMORY_DIR,
+    OLD_DEFAULT_PERSONALITY,
 )
 from database import current_chat_id, db_connect, now
 from settings import (
@@ -328,6 +330,8 @@ def _settings_state() -> dict[str, Any]:
             result[key] = _as_int(raw)
         else:
             result[key] = raw
+    result["personality_default"] = DEFAULT_PERSONALITY
+    result["personality_classic"] = OLD_DEFAULT_PERSONALITY
     return result
 
 
@@ -1150,6 +1154,12 @@ class AppHandler(BaseHTTPRequestHandler):
                         if not 0.0 <= ratio <= 1.0:
                             raise ValueError("GPU offload ratio must be from 0.0 through 1.0.")
                         value = str(ratio)
+                elif key == "personality":
+                    value = str(value).strip()
+                    if not value:
+                        raise ValueError("Personality cannot be empty.")
+                    if len(value) > 24_000:
+                        raise ValueError("Personality is limited to 24,000 characters.")
                 elif key in _BOOL_SETTINGS:
                     value = "true" if bool(value) else "false"
                 elif key in _INT_SETTINGS:
@@ -1239,6 +1249,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 file_b = int(stored_b["id"])
             if file_a <= 0 or file_b <= 0:
                 raise ValueError("Paste both lists or choose two uploaded text files.")
+            if not (isinstance(text_a, str) and text_a.strip()) and not (isinstance(text_b, str) and text_b.strip()) and file_a == file_b:
+                raise ValueError("Choose two different uploaded text files.")
             result = compare_uploaded_lists(chat_id, file_a, file_b)
             mode = str(payload.get("mode") or "duplicates").casefold()
             if mode not in {"duplicates", "missing"}:
@@ -1255,6 +1267,12 @@ class AppHandler(BaseHTTPRequestHandler):
                 output_lines += [f"Only in List A ({int(counts.get('only_a', 0)):,}):", *(result.get("only_a") or ["(none)"]), "", f"Only in List B ({int(counts.get('only_b', 0)):,}):", *(result.get("only_b") or ["(none)"])]
             else:
                 output_lines += [f"Shared entries / duplicates across both lists ({int(counts.get('shared', 0)):,}):", *(result.get("duplicates") or ["(none)"])]
+                internal_a = result.get("internal_duplicates_a") or []
+                internal_b = result.get("internal_duplicates_b") or []
+                if internal_a:
+                    output_lines += ["", f"Repeated within List A ({len(internal_a):,}):", *internal_a]
+                if internal_b:
+                    output_lines += ["", f"Repeated within List B ({len(internal_b):,}):", *internal_b]
             result["output"] = create_generated_file(
                 chat_id, f"list_{'missing' if mode == 'missing' else 'duplicates'}.txt",
                 "\n".join(output_lines), source_job_id="list-compare",

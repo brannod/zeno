@@ -2283,6 +2283,12 @@ class DiscordBridge:
                         f"Shared entries / duplicates across both lists ({int(counts.get('shared', 0)):,}):",
                         *(comparison.get("duplicates") or ["(none)"]),
                     ]
+                    internal_a = comparison.get("internal_duplicates_a") or []
+                    internal_b = comparison.get("internal_duplicates_b") or []
+                    if internal_a:
+                        lines += ["", f"Repeated within List A ({len(internal_a):,}):", *internal_a]
+                    if internal_b:
+                        lines += ["", f"Repeated within List B ({len(internal_b):,}):", *internal_b]
                 if int(counts.get("internal_duplicates_a", 0)) or int(counts.get("internal_duplicates_b", 0)):
                     lines += ["", f"Internal duplicate rows: List A {int(counts.get('internal_duplicates_a', 0)):,} · List B {int(counts.get('internal_duplicates_b', 0)):,}."]
                 answer = "\n".join(lines)

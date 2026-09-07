@@ -998,30 +998,31 @@ def process_discord_chat(
             raise InterruptedError("Discord generation was stopped.")
         answer = sanitize_discord_answer(answer, content, no_code=bool(directives.get("no_code")))
         if not answer:
-            # Some LM Studio builds/models finish a stream with reasoning or
-            # metadata but no visible message.delta content. Retry once using
-            # the same prompt through the non-stream endpoint before reporting
-            # an empty reply. This also handles providers whose SSE framing is
-            # slightly different from OpenAI's format.
+            # A few OpenAI-compatible gateways close a stream after metadata or
+            # reasoning only. Retry once without streaming so Discord never
+            # receives an empty reply when the provider can still return text.
             discord_reply_progress_update(
-                external_id, "retrying", None,
-                "The stream contained no visible answer; retrying once", 0,
+                external_id, "retrying", 88.0,
+                "The stream contained no visible text; retrying once", 0,
             )
-            fallback = nonstream_completion(
-                messages,
-                max_tokens=12_000,
-                temperature=0.35,
-                model_mode=None,
-                timeout_seconds=LM_LONG_GENERATION_TIMEOUT_SECONDS,
-                request_class="chat",
-                stop_event=active_stop,
-            )
+            try:
+                fallback = nonstream_completion(
+                    messages,
+                    max_tokens=12_000,
+                    temperature=0.35,
+                    model_mode=None,
+                    timeout_seconds=LM_LONG_GENERATION_TIMEOUT_SECONDS,
+                    request_class="chat",
+                    stop_event=active_stop,
+                )
+            except Exception as exc:
+                raise RuntimeError(
+                    "The model returned no visible Discord text, and the one-time non-stream retry failed: "
+                    + str(exc)[:500]
+                ) from exc
             answer = sanitize_discord_answer(fallback, content, no_code=bool(directives.get("no_code")))
         if not answer:
-            raise RuntimeError(
-                "The model returned no visible message text (stream and fallback were empty). "
-                "This usually means the attached file exceeded the active context window or the provider returned reasoning-only output."
-            )
+            raise RuntimeError("Zeno returned an empty Discord reply after retrying the provider.")
 
         assistant_id = append_chat_message(
             chat_id,
@@ -2361,21 +2362,17 @@ class DiscordBridge:
                     except Exception:
                         await self._finish_progress_card(card, "⚠️ File task did not finish")
                         raise
-                if command in {"!cardcolon", "!cardcolon5"}:
-                    await message.reply(
-                        answer,
-                        mention_author=False,
-                        allowed_mentions=discord.AllowedMentions.none(),
-                    )
-                else:
-                    generated_raw, metadata = await asyncio.to_thread(read_generated_file, int(stored["id"]), chat_id=chat_id)
-                    file_obj = discord.File(io.BytesIO(generated_raw), filename=str(metadata["name"]))
-                    await message.reply(
-                        answer,
-                        file=file_obj,
-                        mention_author=False,
-                        allowed_mentions=discord.AllowedMentions.none(),
-                    )
+                # Every file transform returns a downloadable attachment. Card
+                # values are never pasted into the message body, but the
+                # generated file is still delivered securely for round-tripping.
+                generated_raw, metadata = await asyncio.to_thread(read_generated_file, int(stored["id"]), chat_id=chat_id)
+                file_obj = discord.File(io.BytesIO(generated_raw), filename=str(metadata["name"]))
+                await message.reply(
+                    answer,
+                    file=file_obj,
+                    mention_author=False,
+                    allowed_mentions=discord.AllowedMentions.none(),
+                )
                 return True
 
             async def _handle_command(self, message: Any, content: str, author_name: str, external_id: str) -> bool:

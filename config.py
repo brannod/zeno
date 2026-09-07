@@ -32,7 +32,7 @@ LEGACY_DISCORD_INFO_PATH = BASE_DIR / "DISCORD_BOT_INFO_HERE.txt"
 LEGACY_MEMORY_IMPORT_PATH = BASE_DIR / "ZENO_LEGACY_MEMORY_IMPORT.md"
 
 APP_NAME = "Zeno"
-APP_VERSION = "3.6.18"
+APP_VERSION = "3.6.19"
 DEFAULT_UPDATE_REPO = "brannod/zeno"
 SELFDEV_CORE_FILES = (
     "zeno.py", "app.html", "requirements.txt", "START_ZENO.bat", "INSTALL_ZENO.bat",
@@ -74,6 +74,11 @@ CHAT_HISTORY_CHAR_BUDGET_DEEP = 14_000
 CHAT_HISTORY_PER_MESSAGE_CHAR_LIMIT = 3_200
 CHAT_MEMORY_CHAR_BUDGET = 1_600
 CHAT_SUMMARY_CHAR_BUDGET = 3_000
+# Long-range conversation retrieval searches the complete local transcript and
+# injects only relevant older excerpts into the live prompt. The archive itself
+# remains unlimited; these budgets only protect the model's finite request size.
+LONG_CONTEXT_RETRIEVAL_LIMIT = 8
+LONG_CONTEXT_RETRIEVAL_CHAR_BUDGET = 12_000
 
 BROWSER_AGENT_MAX_STEPS = 40
 BROWSER_AGENT_STEP_DELAY = 0.35

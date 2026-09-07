@@ -1,4 +1,4 @@
-ZENO 3.6.18
+ZENO 3.6.19
 ===========
 
 Zeno is a private local assistant with chat, files, memory, Live Browser,
@@ -39,6 +39,9 @@ FILES
   shared duplicates or entries missing from either side.
 - Settings -> Zeno personality lets you edit the prompt used by both GUI and
   Discord, restore the classic prompt, or reset to the current default.
+- Conversation history is archived in SQLite without an app-level cap. Relevant
+  older turns are retrieved into each live prompt; Settings -> Context & memory
+  controls archive retrieval and excerpt count.
 - Outputs are written under zeno_data/outputs/ and are never silently replaced.
 
 API PROVIDERS

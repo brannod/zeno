@@ -194,6 +194,8 @@ _SETTING_KEYS = (
     "auto_summary",
     "memory_retrieval_enabled",
     "memory_retrieval_limit",
+    "long_context_retrieval_enabled",
+    "long_context_retrieval_limit",
     "adaptive_context_enabled",
     "use_browser",
     "include_page_screenshot",
@@ -214,6 +216,7 @@ _BOOL_SETTINGS = {
     "auto_memory",
     "auto_summary",
     "memory_retrieval_enabled",
+    "long_context_retrieval_enabled",
     "adaptive_context_enabled",
     "use_browser",
     "include_page_screenshot",
@@ -227,6 +230,7 @@ _INT_SETTINGS = {
     "summary_trigger_messages": (10, 100),
     "summary_keep_messages": (4, 40),
     "memory_retrieval_limit": (3, 30),
+    "long_context_retrieval_limit": (1, 20),
     "live_assist_interval_seconds": (5, 3600),
 }
 

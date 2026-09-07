@@ -652,11 +652,14 @@ def compare_text_lists(text_a: str, text_b: str) -> dict[str, Any]:
 
     original_a, counts_a = prepare(text_a)
     original_b, counts_b = prepare(text_b)
-    shared = sorted(set(original_a) & set(original_b))
-    only_a = sorted(set(original_a) - set(original_b))
-    only_b = sorted(set(original_b) - set(original_a))
-    internal_a = sorted(key for key, count in counts_a.items() if count > 1)
-    internal_b = sorted(key for key, count in counts_b.items() if count > 1)
+    # Preserve each list's first-seen order. Alphabetical sorting made a
+    # comparison technically correct but hard to reconcile with the source
+    # files, especially for email exports and operational lists.
+    shared = [key for key in original_a if key in original_b]
+    only_a = [key for key in original_a if key not in original_b]
+    only_b = [key for key in original_b if key not in original_a]
+    internal_a = [key for key in original_a if counts_a[key] > 1]
+    internal_b = [key for key in original_b if counts_b[key] > 1]
     return {
         "duplicates": [original_a[key] for key in shared],
         "only_a": [original_a[key] for key in only_a],

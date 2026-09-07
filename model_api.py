@@ -48,6 +48,22 @@ _MAX_ERROR_BODY_BYTES = 16_000
 _MAX_NONSTREAM_RESPONSE_BYTES = 8_000_000
 
 
+def _content_text(value: Any) -> str:
+    """Normalize OpenAI-compatible text fields from string/list/dict variants."""
+    if isinstance(value, str):
+        return value
+    if isinstance(value, dict):
+        for key in ("text", "content", "value"):
+            if key in value:
+                text = _content_text(value.get(key))
+                if text:
+                    return text
+        return ""
+    if isinstance(value, list):
+        return "".join(_content_text(item) for item in value)
+    return str(value or "")
+
+
 def _remote_provider_enabled() -> bool:
     return str(active_config().get("id") or "local") != "local"
 
@@ -125,17 +141,7 @@ def _remote_stream_completion(
                 event = json.loads(data)
                 choice = (event.get("choices") or [{}])[0]
                 delta = choice.get("delta") or {}
-                text = delta.get("content") or delta.get("reasoning_content") or ""
-                if not text:
-                    text = choice.get("text") or event.get("content") or ""
-                if isinstance(text, dict):
-                    text = text.get("text") or text.get("content") or ""
-                if isinstance(text, list):
-                    text = "".join(
-                        str(part.get("text") or part.get("content") or "")
-                        if isinstance(part, dict) else str(part)
-                        for part in text
-                    )
+                text = _content_text(delta.get("content") or delta.get("reasoning_content"))
             except (json.JSONDecodeError, IndexError, TypeError, AttributeError):
                 continue
             if text:
@@ -170,7 +176,7 @@ def _remote_vision_completion(
                 result = json.loads(response.read(_MAX_NONSTREAM_RESPONSE_BYTES + 1).decode("utf-8", errors="replace"))
         except urllib.error.HTTPError as exc:
             raise _remote_error(exc, str(active_config().get("name") or "API provider")) from exc
-        answer = result["choices"][0]["message"].get("content") or result["choices"][0]["message"].get("reasoning_content")
+        answer = _content_text(result["choices"][0]["message"].get("content") or result["choices"][0]["message"].get("reasoning_content"))
         if not answer:
             raise RuntimeError("API provider returned an empty vision response.")
         return model, f"{str(active_config().get('id') or 'remote')}-openai-compat", str(answer).strip()
@@ -654,7 +660,7 @@ def nonstream_completion(
                 raise RuntimeError("API provider returned an unexpectedly large response.")
             result = json.loads(raw.decode("utf-8", errors="replace"))
             message = result["choices"][0]["message"]
-            answer = message.get("content") or message.get("reasoning_content") or message.get("reasoning")
+            answer = _content_text(message.get("content") or message.get("reasoning_content") or message.get("reasoning"))
             if not answer:
                 raise RuntimeError("API provider returned an empty response.")
             return str(answer).strip()
@@ -705,11 +711,7 @@ def nonstream_completion(
 
         result = json.loads(raw.decode("utf-8"))
         message = result["choices"][0]["message"]
-        answer = (
-            message.get("content")
-            or message.get("reasoning_content")
-            or message.get("reasoning")
-        )
+        answer = _content_text(message.get("content") or message.get("reasoning_content") or message.get("reasoning"))
         if not answer:
             raise KeyError("empty response")
         return str(answer).strip()
@@ -878,7 +880,7 @@ def vision_completion(
                     raise RuntimeError("LM Studio returned an unexpectedly large vision response.")
                 result = json.loads(raw.decode("utf-8"))
                 message = result["choices"][0]["message"]
-                answer = message.get("content") or message.get("reasoning_content") or message.get("reasoning")
+                answer = _content_text(message.get("content") or message.get("reasoning_content") or message.get("reasoning"))
                 if not answer:
                     raise KeyError("empty response")
                 return model, "openai-compat", str(answer).strip()
@@ -1155,16 +1157,7 @@ def stream_completion_native_progress(
                     output_chars,
                 )
             elif event_type == "message.delta":
-                raw_content = event.get("content")
-                if isinstance(raw_content, dict):
-                    raw_content = raw_content.get("text") or raw_content.get("content") or ""
-                if isinstance(raw_content, list):
-                    raw_content = "".join(
-                        str(part.get("text") or part.get("content") or "")
-                        if isinstance(part, dict) else str(part)
-                        for part in raw_content
-                    )
-                text = str(raw_content or "")
+                text = _content_text(event.get("content"))
                 if text:
                     output_chars += len(text)
                     _safe_progress(

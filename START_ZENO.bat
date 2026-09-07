@@ -1,7 +1,7 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-title Zeno 3.6.16
+title Zeno 3.6.17
 set PYTHONUNBUFFERED=1
 py -3 -u zeno.py
 if errorlevel 1 (

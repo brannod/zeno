@@ -1,7 +1,8 @@
-ZENO 3.6.16 - DISCORD EMPTY-REPLY RECOVERY
+ZENO 3.6.16 - WELCOME HOME + FILE HANDOFF
 
-- Added a one-time non-stream fallback when a Discord stream completes without visible message text.
-- Improved OpenAI-compatible and LM Studio stream parsing for text, list, and object content frames.
-- Replaced the generic empty-reply failure with a diagnostic message identifying context-window or reasoning-only causes.
-- Kept Discord attachment handling, long-output .txt delivery, and the compact Files workspace unchanged.
-- Updated visible version labels, setup scripts, and guides to 3.6.16.
+- Added a welcoming Home tab as the first GUI tool with quick actions and workspace status.
+- Kept Files as its own focused tab with paste-first File Worker, uploads, comparisons, AYCD tools, and generated outputs.
+- Standardized the visible and documented version to 3.6.16.
+- Improved OpenAI-compatible stream parsing for text/list/dict content payloads.
+- Added a one-time non-stream Discord retry when a provider emits an empty visible stream.
+- GUI and Discord continue to support multi-file upload, local transforms, generated-file downloads, and long replies as .txt attachments.

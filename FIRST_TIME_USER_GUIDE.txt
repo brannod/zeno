@@ -1,4 +1,4 @@
-ZENO 3.6.17 — FIRST-TIME USER GUIDE
+ZENO 3.6.18 — FIRST-TIME USER GUIDE
 ===================================
 
 WINDOWS
@@ -26,6 +26,8 @@ FIRST SETTINGS
 - Settings -> API Providers: enter an exact provider model ID and key, save it,
   then test it. A provider-side HTTP 4xx/5xx response is not automatically a
   bad key; read the returned status detail.
+- Settings -> Zeno personality: edit how Zeno speaks in both the GUI and
+  Discord. Use Classic Zeno or Reset default when you want the built-in prompt.
 - Files -> AYCD / MCP tools: configure AYCD only if its MCP endpoint is running.
 - Settings -> Zeno Updates: confirm the repository is brannod/zeno.
 

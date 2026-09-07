@@ -1,4 +1,4 @@
-ZENO 3.6.16 - WELCOME HOME + FILE HANDOFF
+ZENO 3.6.16 - WELCOME HOME + FILE HANDOFF (HISTORICAL)
 
 - Added a welcoming Home tab as the first GUI tool with quick actions and workspace status.
 - Kept Files as its own focused tab with paste-first File Worker, uploads, comparisons, AYCD tools, and generated outputs.

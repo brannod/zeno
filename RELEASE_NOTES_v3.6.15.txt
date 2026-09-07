@@ -1,0 +1,9 @@
+ZENO 3.6.15 - COMPACT FILES WORKSPACE
+
+- Reorganized the Files tool into a compact top-to-bottom workflow: upload, paste/transform, then compare.
+- Made File Worker paste input the primary control with a larger, high-contrast text box.
+- Added an expandable uploaded-file fallback so the worker no longer shows several competing inputs at once.
+- Added a clear PASTE OR UPLOAD label and an Action preset label for quick cleanup workflows such as Email:Password Cleanup.
+- Moved AYCD and other specialized tools below the everyday file workflow so they no longer crowd the top of the panel.
+- Kept list comparison, AYCD formatting, inbound bridge, generated outputs, and all existing IDs/routes intact.
+- Updated visible version labels, setup scripts, and guides to 3.6.15.

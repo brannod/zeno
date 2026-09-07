@@ -1,4 +1,4 @@
-ZENO 3.6.15
+ZENO 3.6.16
 ===========
 
 Zeno is a private local assistant with chat, files, memory, Live Browser,

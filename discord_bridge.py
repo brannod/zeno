@@ -22,6 +22,14 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+# Keep the module-level reply/file helpers usable after the Discord client is
+# started. The client itself still reports a clear setup error if discord.py is
+# missing, but ordinary replies must not fail with a missing global name.
+try:
+    import discord  # type: ignore
+except Exception:  # pragma: no cover - optional dependency during local checks
+    discord = None  # type: ignore[assignment]
+
 from browser import LIVE_BROWSER, browser_status, playwright_available
 from browser_agent import (
     browser_agent_latest, browser_agent_row, resume_browser_agent,

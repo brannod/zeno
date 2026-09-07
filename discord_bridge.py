@@ -79,7 +79,7 @@ from jobs import (
     unregister_chat_operation,
 )
 from memory import manual_context_to_memory, memory_stats, optimize_memories
-from model_api import lm_models, model_api_status, stream_completion, stream_completion_native_progress
+from model_api import lm_models, model_api_status, nonstream_completion, stream_completion, stream_completion_native_progress
 from mcp_manager import maybe_mcp_context, mcp_context_message
 from aycd_commands import (
     handle_aycd_command, aycd_reaction_action, aycd_job, aycd_job_reactions,
@@ -998,7 +998,30 @@ def process_discord_chat(
             raise InterruptedError("Discord generation was stopped.")
         answer = sanitize_discord_answer(answer, content, no_code=bool(directives.get("no_code")))
         if not answer:
-            raise RuntimeError("Zeno returned an empty Discord reply.")
+            # Some LM Studio builds/models finish a stream with reasoning or
+            # metadata but no visible message.delta content. Retry once using
+            # the same prompt through the non-stream endpoint before reporting
+            # an empty reply. This also handles providers whose SSE framing is
+            # slightly different from OpenAI's format.
+            discord_reply_progress_update(
+                external_id, "retrying", None,
+                "The stream contained no visible answer; retrying once", 0,
+            )
+            fallback = nonstream_completion(
+                messages,
+                max_tokens=12_000,
+                temperature=0.35,
+                model_mode=None,
+                timeout_seconds=LM_LONG_GENERATION_TIMEOUT_SECONDS,
+                request_class="chat",
+                stop_event=active_stop,
+            )
+            answer = sanitize_discord_answer(fallback, content, no_code=bool(directives.get("no_code")))
+        if not answer:
+            raise RuntimeError(
+                "The model returned no visible message text (stream and fallback were empty). "
+                "This usually means the attached file exceeded the active context window or the provider returned reasoning-only output."
+            )
 
         assistant_id = append_chat_message(
             chat_id,

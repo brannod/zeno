@@ -1,0 +1,7 @@
+ZENO 3.6.16 - DISCORD EMPTY-REPLY RECOVERY
+
+- Added a one-time non-stream fallback when a Discord stream completes without visible message text.
+- Improved OpenAI-compatible and LM Studio stream parsing for text, list, and object content frames.
+- Replaced the generic empty-reply failure with a diagnostic message identifying context-window or reasoning-only causes.
+- Kept Discord attachment handling, long-output .txt delivery, and the compact Files workspace unchanged.
+- Updated visible version labels, setup scripts, and guides to 3.6.16.

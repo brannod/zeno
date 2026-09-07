@@ -1,4 +1,4 @@
-ZENO 3.6.14 DISCORD GUIDE
+ZENO 3.6.15 DISCORD GUIDE
 
 1. Create a Discord application/bot in the Discord Developer Portal.
 2. Enable Message Content Intent for the bot.
@@ -23,7 +23,7 @@ List comparison:
 - Large comparison results and large normal replies are sent as complete UTF-8
   `.txt` attachments instead of being truncated by Discord's message limit.
 
-AYCD local card formatting (v3.6.14):
+AYCD local card formatting (v3.6.15):
 - !cardcolon       -> number:month:year:cvv
 - !cardcolon5 TYPE -> type:number:month:year:cvv
 Attach/reply to a text file. Formatted output is saved locally under Zeno Files -> Generated outputs and is not reposted into Discord.

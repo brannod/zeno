@@ -25,6 +25,7 @@ from jobs import (
     stop_maintenance_worker,
 )
 from files import resume_pending_file_jobs, stop_file_jobs_for_chat
+from memory import save_memory_bundle
 from browser import set_browser_chat_append_hook, shutdown_live_browser
 from browser_agent import set_browser_agent_chat_append_hook, stop_browser_agents_for_chat
 from screen_reader import set_screen_reader_chat_append_hook, stop_screen_reader_jobs_for_chat
@@ -106,6 +107,10 @@ def initialize() -> None:
 
 
 def shutdown() -> None:
+    try:
+        save_memory_bundle(None, "process shutdown checkpoint")
+    except Exception as exc:
+        console_log(f"Memory checkpoint warning: {exc}")
     try:
         stop_discord_bridge()
     except Exception as exc:

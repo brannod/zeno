@@ -26,4 +26,4 @@ List comparison:
 AYCD local card formatting (v3.6.16):
 - !cardcolon       -> number:month:year:cvv
 - !cardcolon5 TYPE -> type:number:month:year:cvv
-Attach/reply to a text file. Formatted output is saved locally under Zeno Files -> Generated outputs and is not reposted into Discord.
+Attach/reply to a text file. Formatted output is saved locally under Zeno Files -> Generated outputs and returned as a downloadable attachment; full values are not pasted into the message body.

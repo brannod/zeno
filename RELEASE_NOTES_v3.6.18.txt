@@ -1,0 +1,19 @@
+ZENO v3.6.18
+============
+
+PERSONALITY
+- Added a Settings -> Zeno personality editor shared by GUI and Discord.
+- Added Classic Zeno and Reset default actions.
+- Personality prompts are validated (non-empty, maximum 24,000 characters)
+  before being saved locally.
+
+LIST COMPARISON
+- GUI and Discord duplicate reports now include repeated rows inside either
+  source list as well as entries shared across both lists.
+- Prevented comparing one uploaded file against itself.
+- Comparison output remains deterministic, case-insensitive, and preserves
+  first-seen spelling and order.
+
+RELEASE / INSTALL
+- Version identifiers and installer text are aligned to 3.6.18.
+- This build retains the 3.6.17 Discord import/streaming hotfixes.

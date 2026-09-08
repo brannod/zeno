@@ -1,4 +1,4 @@
-ZENO 3.6.19 DISCORD GUIDE
+ZENO 3.6.20 DISCORD GUIDE
 
 1. Create a Discord application/bot in the Discord Developer Portal.
 2. Enable Message Content Intent for the bot.
@@ -19,16 +19,25 @@ Zeno keeps the complete shared Discord conversation in its local database.
 Relevant older turns can be retrieved into later prompts, while the model's
 finite context window remains protected by bounded excerpts and rolling summaries.
 
+Memory commands:
+- `!context` summarizes the full shared chat into a master context summary and
+  durable Memory Bank entries while continuing the current live window.
+- `!compact` performs the same save, then starts a smaller live window backed by
+  that summary, durable memories, and the retrievable full transcript.
+- Neither command deletes the original visible or database history.
+
 List comparison:
 - `!comparelist` or `!listcompare` with exactly two attached text files lists
   entries shared by both lists (case-insensitive, trimmed matching).
 - The duplicate report also lists repeated rows found inside List A or List B.
 - `!listmissing` with exactly two attached text files lists entries found only
   in List A and only in List B.
-- Large comparison results and large normal replies are sent as complete UTF-8
-  `.txt` attachments instead of being truncated by Discord's message limit.
+- Long normal replies are sent in as many as 10 numbered Discord messages.
+- Extremely long replies show three preview parts and include the complete
+  UTF-8 `.txt` attachment so the answer is never truncated.
+- Large comparison reports remain available as complete downloadable files.
 
-AYCD local card formatting (v3.6.19):
+AYCD local card formatting (v3.6.20):
 - !cardcolon       -> number:month:year:cvv
 - !cardcolon5 TYPE -> type:number:month:year:cvv
 Attach/reply to a text file. Formatted output is saved locally under Zeno Files -> Generated outputs and returned as a downloadable attachment; full values are not pasted into the message body.

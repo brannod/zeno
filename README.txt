@@ -1,4 +1,4 @@
-ZENO 3.6.19
+ZENO 3.6.20
 ===========
 
 Zeno is a private local assistant with chat, files, memory, Live Browser,
@@ -63,8 +63,9 @@ Discord remains a chat interface sharing Zeno's active conversation. It can
 receive attachments, return generated files, show progress, and use commands
 such as !help, !status, !screenshot, !scramble, !removedupes, !job, !stop,
 !cardcolon, !cardcolon5 TYPE, !comparelist, !listcompare, and !listmissing.
-Prefix commands are used; slash commands are not required. Responses larger
-than Discord's message limit are sent as complete UTF-8 .txt attachments.
+Prefix commands are used; slash commands are not required. Long responses are
+sent as many as 10 numbered Discord messages. Extremely long responses show
+three preview parts and attach the complete UTF-8 .txt file without truncation.
 
 UPDATES
 -------

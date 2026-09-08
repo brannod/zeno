@@ -1,4 +1,4 @@
-ZENO 3.6.19 — FIRST-TIME USER GUIDE
+ZENO 3.6.20 — FIRST-TIME USER GUIDE
 ===================================
 
 WINDOWS
@@ -51,8 +51,9 @@ DISCORD LIST TOOLS
 ------------------
 Attach two text files to one message and use `!comparelist` (or `!listcompare`)
 to list shared entries, or `!listmissing` to list entries unique to each file.
-Discord uses prefix commands only. Oversized replies are delivered as .txt
-files so complete output is preserved. File transforms return a downloadable
+Discord uses prefix commands only. Long replies are delivered in as many as 10
+numbered messages. Extremely long replies include three preview messages and a
+complete .txt attachment. File transforms return a downloadable
 attachment; sensitive card values are kept out of the message body.
 
 SAFETY AND DATA
